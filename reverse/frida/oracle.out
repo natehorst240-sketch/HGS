@@ -1,0 +1,11 @@
+hgs_oracle active
+oracle attached. Start a download in HGS now.
+will inject reply once HGS transmits a request...
+[1121662 ms] handle 0x574 (\\.\COM1)
+[1121715 ms] >> 44 4f 57 4e 4c 4f 41 44 20 4c 4f 47 53 20 20 20 20 20 20 20 20 20 20 20 20 
+HGS TX: 'DOWNLOAD LOGS            '  (request)
+injected reply (64 bytes). Watching HGS reaction...
+[1126866 ms] >> 44 4f 57 4e 4c 4f 41 44 20 4c 4f 47 53 20 20 20 20 20 20 20 20 20 20 20 20 
+HGS TX: 'DOWNLOAD LOGS            '  (request)
+[1126867 ms] << injected 64 byte(s), 0 left
+   delivered 64 bytes to HGS

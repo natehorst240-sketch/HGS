@@ -1,0 +1,4 @@
+(sym_lib_table
+  (version 7)
+  (lib (name "HGS_Carrier")(type "KiCad")(uri "${KIPRJMOD}/HGS_Carrier.kicad_sym")(options "")(descr "HGS Download Stick carrier - project symbols"))
+)

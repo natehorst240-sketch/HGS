@@ -1,0 +1,21 @@
+# separate projects that live in this folder but have their own repos
+Balancer/
+ADSB/
+
+# python
+__pycache__/
+*.pyc
+.venv/
+
+# build output
+.pio/
+firmware/arduino/test/replay_test.exe
+*.o
+
+# KiCad autosaves, backups, locks
+*-backups/
+*.kicad_pcb-bak
+*.kicad_sch-bak
+*.lck
+_autosave-*
+fp-info-cache

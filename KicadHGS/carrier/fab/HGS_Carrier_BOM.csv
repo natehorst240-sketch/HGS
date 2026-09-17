@@ -1,0 +1,5 @@
+"Designator","Value","Footprint","Qty"
+"C1-C5","100nF","Capacitor_SMD:C_0603_1608Metric","5"
+"J1","ESP32-S3-Touch-LCD-1.9","Module:RaspberryPi_Pico_Common_THT","1"
+"J2","DE9_Pins","Connector_Dsub:DSUB-9_Pins_Horizontal_P2.77x2.84mm_EdgePinOffset4.94mm_Housed_MountingHolesOffset4.94mm","1"
+"U1","MAX3232","Package_SO:SOIC-16_3.9x9.9mm_P1.27mm","1"

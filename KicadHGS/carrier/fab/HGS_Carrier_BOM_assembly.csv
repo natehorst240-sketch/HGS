@@ -1,0 +1,11 @@
+Item,Designator,Qty,Value,Footprint,Type,Manufacturer,MPN,Mounted,Notes
+1,"C1,C2,C3,C4,C5",5,100nF 50V X7R,0603,SMD,Samsung,CL10B104KB8NNNC,Yes,Any 0603 100nF X7R 25V+ is fine
+2,"R1,R2",2,47R 1% 1/10W,0603,SMD,Yageo,RC0603FR-0747RL,Yes,Series protection on the TTL pair
+3,U1,1,MAX3232 RS-232 transceiver,SOIC-16 (3.9x9.9mm),SMD,Analog Devices,MAX3232ESE+,Yes,"-40..85C. TI MAX3232IDR is an acceptable equivalent"
+4,J2,1,DE9 male horizontal housed,DSUB-9 P2.77x2.84mm EdgePinOffset4.94mm,THT,Amphenol,L717SDE09P,Yes,"** VERIFY DIMENSIONS ** must match EdgePinOffset 4.94mm / MountingHolesOffset 4.94mm"
+5,"JP1,JP2,JP3",3,Solder jumper,SolderJumper-3 P1.3mm,-,-,-,No,"PCB pads only - nothing to source. Leave OPEN, customer bridges"
+6,"D1,D2",2,SM712 TVS,SOD-323,SMD,-,-,No,DO NOT FIT - unpopulated transient-protection option
+7,Q1,1,2N7002 N-MOSFET,SOT-23,SMD,-,-,No,DO NOT FIT - unpopulated FUNCTION SEL option
+8,R3,1,1k,0603,SMD,-,-,No,DO NOT FIT - goes with Q1
+9,R4,1,10k,0603,SMD,-,-,No,DO NOT FIT - goes with Q1
+10,J1,1,ESP32-S3-Touch-LCD-1.9 module,2x20 THT 2.54mm / 17.78mm rows,THT,-,-,No,"FOOTPRINT ONLY - DO NOT FIT OR SOURCE. Module is fitted by customer; holes must be left open and unsoldered"

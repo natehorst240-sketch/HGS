@@ -1,0 +1,50 @@
+** Drc report for HGS_Carrier.kicad_pcb **
+** Created on 2026-08-21T06:09:30 **
+** Report includes: Errors **
+
+** Found 8 DRC violations **
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(132.7500 mm, 49.0000 mm): Footprint REF**
+    @(136.3600 mm, 41.4325 mm): Footprint J1
+[npth_inside_courtyard]: NPTH inside courtyard
+    Local override; error
+    @(132.7500 mm, 49.0000 mm): NPTH pad of REF**
+    @(136.3600 mm, 41.4325 mm): Footprint J1
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(136.3600 mm, 41.4325 mm): Footprint J1
+    @(132.7500 mm, 89.7500 mm): Footprint REF**
+[npth_inside_courtyard]: NPTH inside courtyard
+    Local override; error
+    @(132.7500 mm, 89.7500 mm): NPTH pad of REF**
+    @(136.3600 mm, 41.4325 mm): Footprint J1
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(136.3600 mm, 41.4325 mm): Footprint J1
+    @(157.7500 mm, 49.0000 mm): Footprint REF**
+[npth_inside_courtyard]: NPTH inside courtyard
+    Local override; error
+    @(157.7500 mm, 49.0000 mm): NPTH pad of REF**
+    @(136.3600 mm, 41.4325 mm): Footprint J1
+[courtyards_overlap]: Courtyards overlap
+    Rule: board setup constraints courtyard; error
+    @(136.3600 mm, 41.4325 mm): Footprint J1
+    @(157.7500 mm, 89.7500 mm): Footprint REF**
+[npth_inside_courtyard]: NPTH inside courtyard
+    Local override; error
+    @(157.7500 mm, 89.7500 mm): NPTH pad of REF**
+    @(136.3600 mm, 41.4325 mm): Footprint J1
+
+** Found 0 unconnected pads **
+
+** Found 0 Footprint errors **
+
+** Ignored checks **
+    - Footprint has no courtyard defined
+    - Track endpoint not centered on via
+    - Tuning profile track geometries
+    - Footprint doesn't match symbol's footprint filters
+    - Footprint component type doesn't match footprint pads
+
+** End of Report **

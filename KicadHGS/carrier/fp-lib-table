@@ -1,0 +1,4 @@
+(fp_lib_table
+  (version 7)
+  (lib (name "HGS_Carrier")(type "KiCad")(uri "${KIPRJMOD}/HGS_Carrier.pretty")(options "")(descr "HGS carrier project footprints"))
+)

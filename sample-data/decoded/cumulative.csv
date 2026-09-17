@@ -1,0 +1,44 @@
+Item,Value
+Cumulative Data,2026-07-07 09:36:59
+Dau Batt. Install Date,2017-01-01
+Aircraft S/N,22366
+Most Recent Flight Start,09:28:50
+Most Recent Flight Stop,09:35:34
+Most Recent Flight Time,00:07
+Total Flight Time,03497:29
+Number of Flights,11622
+Chip Burner Activations,1473
+Main Transmission S/N,000219
+Main Transmission TBO,4800
+Main Transmission TSN,03497:29
+Main Transmission Cumulative Chip D.A.,194
+Tail Transmission S/N,TUR4004
+Tail Transmission TBO,3000
+Tail Transmission TSN,03497:29
+Tail Transmission Cumulative Chip D.A.,536
+Engine 1 S/N,BH0821
+Engine 1 TBO,3500
+Engine 1 TSN,03497:29
+Engine 1 Running Time,04785:38
+Engine 1 Chip D.A.,0
+Engine 1 Start-up,09:25:58
+Engine 1 Shutdown,09:36:44
+Engine 1 LIM ON Activations,2529
+Engine 1 Training Activations,478
+Engine 1 EECU P/N,1002904-2-104
+Engine 1 Compr.Turbine C.Counts,8449
+Engine 1 Pwr Turbine C.Counts,9510
+Engine 1 Imp.Turbine C.Counts,4556
+Engine 2 S/N,BH0819
+Engine 2 TBO,3500
+Engine 2 TSN,03497:29
+Engine 2 Running Time,04707:40
+Engine 2 Chip D.A.,3
+Engine 2 Start-up,09:27:00
+Engine 2 Shutdown,09:36:45
+Engine 2 LIM ON Activations,2530
+Engine 2 Training Activations,257
+Engine 2 EECU P/N,1002904-2-104
+Engine 2 Compr.Turbine C.Counts,9024
+Engine 2 Pwr Turbine C.Counts,9387
+Engine 2 Imp.Turbine C.Counts,4292

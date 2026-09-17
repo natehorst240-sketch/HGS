@@ -1,0 +1,12 @@
+hgs_sniff active — perform a normal download now.
+[       0 ms] -- OPEN \\.\COM1 handle=0x3d4
+[       0 ms] -- OPEN \\.\COM1 handle=0x3d4
+[       2 ms] ~~ WaitCommEvent ret=0x0
+[      58 ms] >> 44 4f 57 4e 4c 4f 41 44 20 4c 4f 47 53 20 20 20 20 20 20 20 20 20 20 20 20
+[      58 ms] ~~ ClearCommError cbInQue=0
+[      58 ms] ~~ WaitCommEvent ret=0x0
+[      58 ms] ~~ ClearCommError cbInQue=0
+[    5246 ms] >> 44 4f 57 4e 4c 4f 41 44 20 4c 4f 47 53 20 20 20 20 20 20 20 20 20 20 20 20
+[    5246 ms] ~~ ClearCommError cbInQue=0
+[    5246 ms] ~~ WaitCommEvent ret=0x0
+[    5247 ms] ~~ ClearCommError cbInQue=0

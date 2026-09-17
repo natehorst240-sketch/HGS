@@ -1,0 +1,244 @@
+(kicad_sch
+	(version 20260306)
+	(generator "eeschema")
+	(generator_version "10.0")
+	(uuid "ac69db7f-f6b9-4305-be70-da9fe619d8b9")
+	(paper "A4")
+	(lib_symbols)
+	(sheet
+		(at 102.87 36.83)
+		(size 16.51 3.81)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0)
+		)
+		(uuid "59a7ddf8-4e9b-4f8a-8593-31ccf3b457a0")
+		(property "Sheetname" "MCU-RP2354A"
+			(at 102.87 36.1184 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "RP2354A.kicad_sch"
+			(at 102.87 41.2246 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "HGS_PCB"
+				(path "/ac69db7f-f6b9-4305-be70-da9fe619d8b9"
+					(page "3")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 40.64 36.83)
+		(size 12.7 3.81)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0)
+		)
+		(uuid "5ea5183c-73a8-4890-9ba2-1528ad050892")
+		(property "Sheetname" "14450_BAT_POWER"
+			(at 40.64 36.1184 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "untitled.kicad_sch"
+			(at 40.64 41.2246 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "HGS_PCB"
+				(path "/ac69db7f-f6b9-4305-be70-da9fe619d8b9"
+					(page "2")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 140.97 35.56)
+		(size 26.67 5.08)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0)
+		)
+		(uuid "5fa016d5-0441-48fe-9bc4-a526fb488e57")
+		(property "Sheetname" "Display"
+			(at 140.97 34.8484 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "Display.kicad_sch"
+			(at 140.97 41.2246 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "HGS_PCB"
+				(path "/ac69db7f-f6b9-4305-be70-da9fe619d8b9"
+					(page "4")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 115.57 81.28)
+		(size 31.75 10.16)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0)
+		)
+		(uuid "613256d0-03b6-49da-8a42-e85177eb26ca")
+		(property "Sheetname" "FLASH"
+			(at 115.57 80.5684 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "FLASH.kicad_sch"
+			(at 115.57 92.0246 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "HGS_PCB"
+				(path "/ac69db7f-f6b9-4305-be70-da9fe619d8b9"
+					(page "6")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 185.42 36.83)
+		(size 39.37 6.35)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0)
+		)
+		(uuid "b4600978-b4d7-48ba-b86f-cd78f9343091")
+		(property "Sheetname" "RS232"
+			(at 185.42 36.1184 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "RS232.kicad_sch"
+			(at 185.42 43.7646 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "HGS_PCB"
+				(path "/ac69db7f-f6b9-4305-be70-da9fe619d8b9"
+					(page "5")
+				)
+			)
+		)
+	)
+	(sheet_instances
+		(path "/"
+			(page "1")
+		)
+	)
+	(embedded_fonts no)
+)

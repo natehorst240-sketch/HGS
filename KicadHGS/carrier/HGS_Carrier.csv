@@ -1,0 +1,13 @@
+"Id";"Designator";"Footprint";"Quantity";"Designation";"Supplier and ref";
+1;"C1, C2, C3, C4, C5";"C_0603_1608Metric";5;"100nF";;;
+2;"D1, D2";"D_SOD-323";2;"SM712 (DNP)";;;
+3;"J1";"RaspberryPi_Pico_Common_THT";1;"ESP32-S3-Touch-LCD-1.9";;;
+4;"J2";"DSUB-9_Pins_Horizontal_P2.77x2.84mm_EdgePinOffset14.56mm_Housed_MountingHolesOffset8.20mm";1;"DE9_Pins";;;
+5;"JP1";"SolderJumper-3_P1.3mm_Open_RoundedPad1.0x1.5mm_NumberLabels";1;"TXD sel";;;
+6;"JP2";"SolderJumper-3_P1.3mm_Open_RoundedPad1.0x1.5mm_NumberLabels";1;"RXD sel";;;
+7;"JP3";"SolderJumper-3_P1.3mm_Open_RoundedPad1.0x1.5mm_NumberLabels";1;"FUNC sel";;;
+8;"Q1";"SOT-23";1;"2N7002 (DNP)";;;
+9;"R1, R2";"R_0603_1608Metric";2;"47R";;;
+10;"R3";"R_0603_1608Metric";1;"1k (DNP)";;;
+11;"R4";"R_0603_1608Metric";1;"10k (DNP)";;;
+12;"U1";"SOIC-16_3.9x9.9mm_P1.27mm";1;"MAX3232";;;

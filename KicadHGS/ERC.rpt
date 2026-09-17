@@ -1,0 +1,91 @@
+ERC report (2026-08-08T08:52:05, Encoding UTF8)
+Report includes: Errors, Warnings, Exclusions
+
+***** Sheet /
+[lib_symbol_mismatch]: Symbol 'Conn_01x12' doesn't match copy in library 'Connector_Generic'
+    ; warning
+    @(6200 mils, 2850 mils): Symbol J2 [Conn_01x12]
+
+***** Sheet /14450_BAT_POWER/
+[power_pin_not_driven]: Input Power pin not driven by any Output Power pins
+    ; error
+    @(2900 mils, 1300 mils): Symbol U1 Pin 4 [~{CE}, Input, Line]
+[power_pin_not_driven]: Input Power pin not driven by any Output Power pins
+    ; error
+    @(2900 mils, 1500 mils): Symbol U1 Pin 6 [EN1, Input, Line]
+[power_pin_not_driven]: Input Power pin not driven by any Output Power pins
+    ; error
+    @(3000 mils, 3950 mils): Symbol U4 Pin 7 [PS/SYNC, Input, Line]
+[power_pin_not_driven]: Input Power pin not driven by any Output Power pins
+    ; error
+    @(3300 mils, 4650 mils): Symbol U4 Pin 9 [GND, Power input, Line]
+[power_pin_not_driven]: Input Power pin not driven by any Output Power pins
+    ; error
+    @(3400 mils, 2100 mils): Symbol U1 Pin 8 [VSS, Power input, Line]
+[power_pin_not_driven]: Input Power pin not driven by any Output Power pins
+    ; error
+    @(3400 mils, 4650 mils): Symbol U4 Pin 3 [PGND, Power input, Line]
+
+***** Sheet /MCU-RP2354A/
+[power_pin_not_driven]: Input Power pin not driven by any Output Power pins
+    ; error
+    @(5500 mils, 5550 mils): Symbol U2 Pin 47 [VREG_PGND, Power input, Line]
+[power_pin_not_driven]: Input Power pin not driven by any Output Power pins
+    ; error
+    @(5600 mils, 5550 mils): Symbol U2 Pin 61 [GND, Power input, Line]
+
+***** Sheet /Display/
+
+***** Sheet /RS232/
+[pin_not_connected]: Pin not connected
+    ; error
+    @(5000 mils, 3700 mils): Symbol U5 Pin 11 [T1IN, Input, Line]
+[pin_not_driven]: Input pin not driven by any Output pins
+    ; error
+    @(5000 mils, 3700 mils): Symbol U5 Pin 11 [T1IN, Input, Line]
+[pin_not_connected]: Pin not connected
+    ; error
+    @(5000 mils, 3900 mils): Symbol U5 Pin 10 [T2IN, Input, Line]
+[pin_not_driven]: Input pin not driven by any Output pins
+    ; error
+    @(5000 mils, 3900 mils): Symbol U5 Pin 10 [T2IN, Input, Line]
+[pin_not_connected]: Pin not connected
+    ; error
+    @(5000 mils, 4100 mils): Symbol U5 Pin 12 [R1OUT, Output, Line]
+[pin_not_connected]: Pin not connected
+    ; error
+    @(5000 mils, 4300 mils): Symbol U5 Pin 9 [R2OUT, Output, Line]
+[power_pin_not_driven]: Input Power pin not driven by any Output Power pins
+    ; error
+    @(5800 mils, 4800 mils): Symbol U5 Pin 15 [GND, Power input, Line]
+[pin_not_connected]: Pin not connected
+    ; error
+    @(6600 mils, 3700 mils): Symbol U5 Pin 14 [T1OUT, Output, Line]
+[pin_not_connected]: Pin not connected
+    ; error
+    @(6600 mils, 3900 mils): Symbol U5 Pin 7 [T2OUT, Output, Line]
+[pin_not_connected]: Pin not connected
+    ; error
+    @(6600 mils, 4100 mils): Symbol U5 Pin 13 [R1IN, Input, Line]
+[pin_not_driven]: Input pin not driven by any Output pins
+    ; error
+    @(6600 mils, 4100 mils): Symbol U5 Pin 13 [R1IN, Input, Line]
+[pin_not_connected]: Pin not connected
+    ; error
+    @(6600 mils, 4300 mils): Symbol U5 Pin 8 [R2IN, Input, Line]
+[pin_not_driven]: Input pin not driven by any Output pins
+    ; error
+    @(6600 mils, 4300 mils): Symbol U5 Pin 8 [R2IN, Input, Line]
+
+***** Sheet /FLASH/
+[power_pin_not_driven]: Input Power pin not driven by any Output Power pins
+    ; error
+    @(5450 mils, 4150 mils): Symbol U3 Pin 4 [GND, Power input, Line]
+
+ ** ERC messages: 23  Errors 22  Warnings 1
+
+ ** Ignored checks:
+    - Global label only appears once in the schematic
+    - Four connection points are joined together
+    - SPICE model issue
+    - Assigned footprint doesn't match footprint filters

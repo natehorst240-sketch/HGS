@@ -1,0 +1,9 @@
+hgs_trace active (17 sites hooked)
+trace attached to 16596
+[140115] >> DOWNLOAD LOGS            
+TX 'DOWNLOAD LOGS            '  (req)
+injected 64 bytes
+[145252] >> DOWNLOAD LOGS            
+TX 'DOWNLOAD LOGS            '  (req)
+[145252] << injected 64
+  << delivered 64

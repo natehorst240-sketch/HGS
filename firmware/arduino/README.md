@@ -230,5 +230,7 @@ inherited from the validated Python implementation.
 - Failed downloads are **kept** as `.PART` for post-mortem. Empty ones are removed.
 - Line noise on a floating RX is rejected before anything is written.
 - `/syslog.txt` on the card records every session.
-- Idle 2 min on the ready screen → deep sleep, wake on touch. Set
-  `IDLE_SLEEP_MS = 0` while developing over USB.
+- Idle 2 min on the ready screen → deep sleep. **Wake by holding the screen
+  ~1.5 s** (`WAKE_HOLD_MS`); a brief touch wakes the chip but it goes straight
+  back to sleep without lighting up, so pocket contact does not start
+  downloads. Set `IDLE_SLEEP_MS = 0` while developing over USB.

@@ -61,3 +61,8 @@ static const uint32_t WATCHDOG_S = 30;
 static const size_t DOWNLOAD_MIN_BYTES = 1000;    // smaller than this = suspect
 static const uint32_t IDLE_SLEEP_MS = 120000;     // 0 disables (use while developing)
 static const uint32_t ABORT_HOLD_MS = 1500;
+// Waking from deep sleep needs a deliberate press-and-hold of this length. A
+// brief touch (pocket, bag, fingertip brushing the panel) still wakes the chip
+// - the interrupt cannot tell a tap from a hold - but the firmware goes
+// straight back to sleep without lighting the screen or mounting storage.
+static const uint32_t WAKE_HOLD_MS = 1500;

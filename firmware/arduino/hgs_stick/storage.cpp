@@ -284,42 +284,64 @@ void nextPartName(char* out, size_t outLen) {
 
 static uint8_t bcd(uint8_t b) { return (b >> 4) * 10 + (b & 0x0F); }
 
-// The aircraft serial and date live in the Cumulative Log block (BCD), near the
-// front of the download - same parse as hgs_basename() in the Python firmware.
-static bool hgsBasename(const char* partPath, char* out, size_t outLen) {
-  File f = vol->open(partPath, FILE_READ);
-  if (!f) return false;
-  // The Cumulative Log block sits near the front of the download; 16 KB is
-  // ample and keeps this off the stack.
-  static uint8_t head[16384];
-  const size_t got = f.read(head, sizeof(head));
-  f.close();
-  if (got < 64) return false;
+// The aircraft serial and date live in the Cumulative Log block (BCD) - see
+// FORMAT.md section 2. Same parse as hgs_basename() in the Python firmware.
+//
+// The block is not at a fixed offset: it follows the parameter catalog and the
+// fault logs, and in real downloads it has been seen at ~26 KB. So the file is
+// streamed through in 4 KB chunks with a carry-over, rather than assuming it
+// fits in some fixed-size head buffer (a 16 KB head is exactly how the first
+// board build ended up naming everything DOWNLOAD_NN).
+static const char   CL_MARKER[]   = "CUMULATIVE LOG";
+static const size_t CL_MARKER_LEN = sizeof(CL_MARKER) - 1;
+static const size_t CL_LABEL_LEN  = 25;                 // space-padded label
+static const size_t CL_NEED       = CL_LABEL_LEN + 16;  // label + date/time/sn
+static const size_t CL_SCAN_LIMIT = 256 * 1024;         // give up past this
+static const size_t CL_CHUNK      = 4096;
+static const size_t CL_CARRY      = 64;                 // >= CL_NEED
 
-  const char* marker = "CUMULATIVE LOG";
-  const size_t mlen = strlen(marker);
-  size_t at = 0;
-  bool found = false;
-  for (size_t i = 0; i + mlen <= got; ++i) {
-    if (memcmp(head + i, marker, mlen) == 0) { at = i; found = true; break; }
-  }
-  if (!found) return false;
-
-  const size_t p = at + 25;                 // past the 25-byte label
-  if (p + 16 > got) return false;
-  const uint8_t yy = bcd(head[p]), mm = bcd(head[p + 1]), dd = bcd(head[p + 2]);
+// Parses the block at `blk` (pointing at the label). Returns false if the
+// date bytes are not a plausible BCD date or the S/N is blank.
+static bool parseCumulative(const uint8_t* blk, char* out, size_t outLen) {
+  const uint8_t* p = blk + CL_LABEL_LEN;
+  const uint8_t yy = bcd(p[0]), mm = bcd(p[1]), dd = bcd(p[2]);
   if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return false;
 
   char sn[6] = {0};
-  memcpy(sn, head + p + 11, 5);
-  // trim spaces
-  for (int i = 4; i >= 0; --i) {
+  memcpy(sn, p + 11, 5);
+  for (int i = 4; i >= 0; --i) {                        // trim trailing spaces
     if (sn[i] == ' ') sn[i] = 0; else break;
   }
   if (!sn[0]) return false;
 
   snprintf(out, outLen, "%s_%02u%02u%02u", sn, yy, mm, dd);
   return true;
+}
+
+static bool hgsBasename(const char* partPath, char* out, size_t outLen) {
+  File f = vol->open(partPath, FILE_READ);
+  if (!f) return false;
+
+  static uint8_t buf[CL_CHUNK + CL_CARRY];
+  size_t carry = 0;
+  size_t scanned = 0;
+  bool found = false;
+  while (!found && scanned < CL_SCAN_LIMIT) {
+    const size_t got = f.read(buf + carry, CL_CHUNK);
+    if (got == 0) break;
+    const size_t len = carry + got;
+    for (size_t i = 0; i + CL_NEED <= len; ++i) {
+      if (memcmp(buf + i, CL_MARKER, CL_MARKER_LEN) != 0) continue;
+      found = parseCumulative(buf + i, out, outLen);
+      break;                                            // first label wins
+    }
+    scanned += got;
+    // Keep the tail so a label straddling two chunks is still seen whole.
+    carry = len < CL_CARRY ? len : CL_CARRY;
+    memmove(buf, buf + len - carry, carry);
+  }
+  f.close();
+  return found;
 }
 
 bool finalise(const char* partPath, char* out, size_t outLen) {

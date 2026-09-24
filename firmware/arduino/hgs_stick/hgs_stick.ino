@@ -122,8 +122,9 @@ static void saveCal(uint32_t seconds) {
 }
 
 // --- deep sleep ---------------------------------------------------------------
-static void enterSleep() {
-  stick_log::line("idle -> deep sleep");
+static void goToSleep(bool logIt) {
+  if (logIt) stick_log::line("idle -> deep sleep");
+  pinMode(PIN_LCD_BL, OUTPUT);
   ui::backlight(false);
   // Hold the pins that must not float while asleep. Without this the CST816's
   // active-low reset can drop as the pads are released, the controller never
@@ -147,6 +148,23 @@ static void enterSleep() {
   esp_sleep_enable_ext1_wakeup(1ULL << PIN_TP_INT, ESP_EXT1_WAKEUP_ALL_LOW);
 #endif
   esp_deep_sleep_start();               // wakes as a cold boot -> setup() again
+}
+
+static void enterSleep() { goToSleep(true); }
+
+// Wake gate. Runs before the screen lights or storage mounts, so a rejected
+// touch costs ~1 s of boot and nothing else - no log line, no USB enumeration,
+// no flash write. Returns only if the panel was held for WAKE_HOLD_MS.
+static void requireWakeHold() {
+  if (esp_sleep_get_wakeup_cause() != ESP_SLEEP_WAKEUP_EXT1) return;   // power-on / reset: no gate
+  const uint32_t t0 = millis();
+  while (millis() - t0 < WAKE_HOLD_MS) {
+    if (!touch.touched()) goToSleep(false);   // does not return
+    delay(20);
+  }
+  // Held long enough. Swallow the release so this press cannot double as the
+  // ready screen's "tap to start".
+  touch.waitRelease();
 }
 
 static bool waitTouchOrSleep() {
@@ -264,6 +282,12 @@ static void runDownload() {
 
   const uint32_t el = (millis() - t0) / 1000;
 
+  // Nothing usable arrived (aborted before the first byte, no response, line
+  // noise): drop the empty .PART rather than litter the volume. Anything with
+  // real bytes in it is kept for post-mortem, whatever the outcome.
+  const bool empty = (storage::fileSize(part) == 0);
+  if (empty) storage::removeFile(part);
+
   if (r.status == dau::Status::Ok && r.bytes >= DOWNLOAD_MIN_BYTES) {
     ui::bar(100);
     saveCal(el);
@@ -289,12 +313,12 @@ static void runDownload() {
     ui::screen("SUSPECT DOWNLOAD", l1, "kept as .PART", "Retry",
                0, ui::BLACK, ui::AMBER);
   } else if (r.status == dau::Status::Aborted) {
-    stick_log::line("download ABORTED by user");
-    ui::screen("COMPLETED WITH ABORT", "partial kept as .PART", "", "Tap to retry",
-               0, ui::BLACK, ui::AMBER);
+    stick_log::line(empty ? "download ABORTED by user (nothing received)"
+                          : "download ABORTED by user (partial kept)");
+    ui::screen("COMPLETED WITH ABORT",
+               empty ? "nothing received" : "partial kept as .PART", "",
+               "Tap to retry", 0, ui::BLACK, ui::AMBER);
   } else {
-    // Nothing usable arrived: drop the empty .PART rather than litter the card.
-    if (storage::fileSize(part) == 0) storage::removeFile(part);
     const bool noise = (r.status == dau::Status::Noise);
     stick_log::line(noise ? "download FAILED (line noise)"
                            : "download FAILED (no response)");
@@ -326,6 +350,10 @@ void setup() {
 
   Serial.begin(115200);                 // USB CDC, debug only
 
+  // Touch first: the wake gate below has to run before anything visible.
+  touch.begin(PIN_TP_SDA, PIN_TP_SCL, PIN_TP_RST, PIN_TP_INT, 170, 320);
+  requireWakeHold();
+
   ui::begin();
   ui::screen("HGS DOWNLOAD STICK", "starting...", "", "");
 
@@ -349,8 +377,6 @@ void setup() {
   // power-up, which would be injected straight into the DAU.
   Serial1.begin(DAU_BAUD, SERIAL_8N1, PIN_DAU_RX, PIN_DAU_TX);
   Serial1.setTimeout(20);
-
-  touch.begin(PIN_TP_SDA, PIN_TP_SCL, PIN_TP_RST, PIN_TP_INT, 170, 320);
 
   if (!storage::begin()) {
     ui::screen("NO STORAGE", "card and flash", "both failed to mount", "",

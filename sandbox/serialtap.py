@@ -10,6 +10,8 @@ timestamps in the format reverse/frida/decode_capture.py reads:
 
     serialtap.py --real /dev/ttyUSB0 [--baud 9600] [--com 1] [--log tap.log]
     serialtap.py --virtual [--peer-file sandbox/logs/peer] ...   (prints the peer pty path)
+    ... --pcap capture.pcapng        also write pcapng for Wireshark (sandbox/wireshark/)
+    ... --pcap /path/to/fifo         live: mkfifo it first, then `wireshark -k -i /path/to/fifo`
 
 Stdlib only (no pyserial). In --real mode the adapter is set to 8N1 at --baud;
 if the program changes the baud rate on its side, the change is mirrored to
@@ -25,6 +27,9 @@ import sys
 import termios
 import time
 import tty
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import pcapng  # noqa: E402
 
 BAUDS = {
     1200: termios.B1200, 2400: termios.B2400, 4800: termios.B4800,
@@ -73,8 +78,13 @@ def slave_baud(slave_fd: int) -> int | None:
 
 
 class Logger:
-    def __init__(self, path: str | None, idle_s: float, quiet: bool):
+    def __init__(self, path: str | None, idle_s: float, quiet: bool, pcap: str | None = None):
         self.fh = open(path, "a") if path else None
+        self.pcap = None
+        if pcap:
+            # a FIFO blocks here until Wireshark opens its end - that's intended
+            self.pcap = pcapng.Writer(open(pcap, "wb"))
+        self.wall0 = time.time()
         self.idle = idle_s
         self.quiet = quiet
         self.t0 = time.monotonic()
@@ -101,6 +111,12 @@ class Logger:
         self.buf[tag].clear()
         ms = int((self.last[tag] - self.t0) * 1000)
         line = "[%8d ms] %s %s" % (ms, tag, " ".join("%02x" % b for b in data))
+        if self.pcap:
+            ifid = pcapng.IF_PROGRAM if tag == ">>" else pcapng.IF_DEVICE
+            try:
+                self.pcap.frame(ifid, data, int((self.wall0 + self.last[tag] - self.t0) * 1_000_000))
+            except BrokenPipeError:
+                self.pcap = None  # Wireshark closed the fifo; keep bridging
         if self.fh:
             self.fh.write(line + "\n")
             self.fh.flush()
@@ -115,6 +131,19 @@ class Logger:
                 self.flush(tag)
         if self.fh:
             self.fh.close()
+        if self.pcap:
+            try:
+                self.pcap.close()
+            except OSError:
+                pass
+
+
+def _is_fifo(path: str) -> bool:
+    import stat
+    try:
+        return stat.S_ISFIFO(os.stat(path).st_mode)
+    except OSError:
+        return False
 
 
 def main() -> int:
@@ -128,6 +157,7 @@ def main() -> int:
     ap.add_argument("--no-link", action="store_true", help="don't touch the Wine prefix; just print the pty path")
     ap.add_argument("--peer-file", help="(--virtual) also write the peer pty path to this file")
     ap.add_argument("--log", help="write decode_capture.py-compatible log here")
+    ap.add_argument("--pcap", help="write pcapng here (regular file, or a FIFO for live Wireshark)")
     ap.add_argument("--idle", type=float, default=50.0, help="frame split gap in ms (default 50)")
     ap.add_argument("-q", "--quiet", action="store_true")
     args = ap.parse_args()
@@ -155,7 +185,9 @@ def main() -> int:
         os.symlink(prog_path, link)
         print(f"COM{args.com} in {args.prefix} -> {prog_path}", flush=True)
 
-    log = Logger(args.log, args.idle / 1000.0, args.quiet)
+    if args.pcap and not args.quiet:
+        print(f"pcapng -> {args.pcap}" + ("  (waiting for a reader)" if _is_fifo(args.pcap) else ""), flush=True)
+    log = Logger(args.log, args.idle / 1000.0, args.quiet, args.pcap)
     cur_baud = args.baud
     last_baud_check = 0.0
     try:

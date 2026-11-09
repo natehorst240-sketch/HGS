@@ -4,21 +4,26 @@
 #   sandbox/run.sh --tap /dev/ttyUSB0 [--baud 9600] PROGRAM.exe [args]   # real adapter, log everything
 #   sandbox/run.sh --sim [--file X.HG6] PROGRAM.exe [args]               # no hardware: dau_sim.py plays the DAU
 #   sandbox/run.sh PROGRAM.exe [args]                                    # plain Wine, whatever com1 already points at
+#   add --wireshark to either tapped mode to open Wireshark live on the serial stream
+#   (HGS decode: sandbox/wireshark/hgs.lua). For a terminal view instead, in another
+#   shell:  sandbox/sniff.py sandbox/logs/<timestamp>.log
 #
-# Logs go to sandbox/logs/<timestamp>.log (decode_capture.py-compatible).
+# Logs go to sandbox/logs/<timestamp>.log (decode_capture.py-compatible) and
+# <timestamp>.pcapng (Wireshark).
 # Env: WINEPREFIX (default ~/.hgs_sandbox), WINEDEBUG (default -all; try +comm to see Wine's serial layer).
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 export WINEPREFIX="${WINEPREFIX:-$HOME/.hgs_sandbox}"
 export WINEDEBUG="${WINEDEBUG:--all}"
 
-TAP=""; SIM=0; BAUD=9600; FILE=""
+TAP=""; SIM=0; BAUD=9600; FILE=""; WS=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --tap)  TAP="$2"; shift 2 ;;
     --sim)  SIM=1; shift ;;
     --baud) BAUD="$2"; shift 2 ;;
     --file) FILE="$2"; shift 2 ;;
+    --wireshark) WS=1; shift ;;
     -h|--help) sed -n 2,10p "$0"; exit 0 ;;
     *) break ;;
   esac
@@ -29,20 +34,31 @@ EXE="$1"; shift
 [ -d "$WINEPREFIX" ] || { echo "no sandbox at $WINEPREFIX - run sandbox/setup.sh first" >&2; exit 1; }
 
 mkdir -p "$HERE/logs"
-LOG="$HERE/logs/$(date +%Y%m%d_%H%M%S).log"
+STAMP=$(date +%Y%m%d_%H%M%S)
+LOG="$HERE/logs/$STAMP.log"
+PCAP="$HERE/logs/$STAMP.pcapng"
 PIDS=()
-cleanup() { for p in "${PIDS[@]:-}"; do [ -n "$p" ] && kill "$p" 2>/dev/null || true; done; }
+if [ "$WS" = 1 ]; then
+  command -v wireshark >/dev/null || { echo "wireshark not installed" >&2; exit 1; }
+  [ -n "$TAP" ] || [ "$SIM" = 1 ] || { echo "--wireshark needs --tap or --sim" >&2; exit 1; }
+  PCAP="$HERE/logs/.live_$STAMP.fifo"
+  mkfifo "$PCAP"
+  wireshark -X "lua_script:$HERE/wireshark/hgs.lua" -k -i "$PCAP" >/dev/null 2>&1 &
+  PIDS+=($!)
+  echo "wireshark started on $PCAP (the tap waits for it to open the pipe)"
+fi
+cleanup() { for p in "${PIDS[@]:-}"; do [ -n "$p" ] && kill "$p" 2>/dev/null || true; done; rm -f "$HERE"/logs/.live_*.fifo; }
 trap cleanup EXIT
 
 if [ -n "$TAP" ]; then
-  python3 "$HERE/serialtap.py" --real "$TAP" --baud "$BAUD" --log "$LOG" &
+  python3 "$HERE/serialtap.py" --real "$TAP" --baud "$BAUD" --log "$LOG" --pcap "$PCAP" &
   PIDS+=($!)
   sleep 0.5
   echo "tap running; log -> $LOG"
 elif [ "$SIM" = 1 ]; then
   PEER="$HERE/logs/.peer"
   rm -f "$PEER"
-  python3 "$HERE/serialtap.py" --virtual --peer-file "$PEER" --log "$LOG" &
+  python3 "$HERE/serialtap.py" --virtual --peer-file "$PEER" --log "$LOG" --pcap "$PCAP" &
   PIDS+=($!)
   for _ in $(seq 1 50); do [ -s "$PEER" ] && break; sleep 0.1; done
   [ -s "$PEER" ] || { echo "serialtap did not come up" >&2; exit 1; }

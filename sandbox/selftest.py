@@ -51,8 +51,9 @@ def main() -> int:
 
     tmp = tempfile.mkdtemp(prefix="hgs_selftest_")
     peer_file, log = os.path.join(tmp, "peer"), os.path.join(tmp, "tap.log")
+    pcap = os.path.join(tmp, "tap.pcapng")
     tap = subprocess.Popen([sys.executable, os.path.join(HERE, "serialtap.py"), "--virtual", "--no-link",
-                            "--peer-file", peer_file, "--log", log, "-q"],
+                            "--peer-file", peer_file, "--log", log, "--pcap", pcap, "-q"],
                            stdout=subprocess.PIPE, text=True)
     first = tap.stdout.readline()
     m = re.search(r"program side (\S+)\s+<->\s+peer side (\S+)", first)
@@ -113,6 +114,16 @@ def main() -> int:
         print("FAIL: tap log does not account for every frame")
     else:
         print("PASS: tap log complete")
+    sys.path.insert(0, HERE)
+    import pcapng
+    pframes = list(pcapng.read(pcap))
+    prx = b"".join(d for ifid, _, d in pframes if ifid == pcapng.IF_DEVICE)
+    ptx = sum(1 for ifid, _, _ in pframes if ifid == pcapng.IF_PROGRAM)
+    if ptx == tx and prx == expected:
+        print(f"PASS: pcapng {pcap}: {len(pframes)} frames, RX payload == source file")
+    else:
+        ok = False
+        print(f"FAIL: pcapng has {ptx} TX frames and {len(prx)} RX bytes")
     dec = os.path.join(HERE, "..", "reverse", "frida", "decode_capture.py")
     if os.path.exists(dec):
         print(f"analyze it with: python3 {os.path.relpath(dec)} {log}")

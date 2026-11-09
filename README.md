@@ -41,6 +41,7 @@ space-padded ASCII; sequence IDs are the only plain big-endian uint16s.
 - `hgs/protocol.py` — serial download state-machine skeleton (`TODO(protocol)`)
 - `hgs/config.py` — INI config replacing the original's registry keys
 - `FORMAT.md` — byte-level file-format specification
+- `sandbox/` — Wine sandbox for the original `.exe` on Linux: `setup.sh`, `run.sh --tap /dev/ttyUSB0` or `--sim` (serial tap + DAU simulator), `selftest.py`
 - `sample-data/` — a real download (S/N 22366) + decoded CSV exports
 
 ## Run (Linux)

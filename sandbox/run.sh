@@ -43,9 +43,12 @@ if [ "$WS" = 1 ]; then
   [ -n "$TAP" ] || [ "$SIM" = 1 ] || { echo "--wireshark needs --tap or --sim" >&2; exit 1; }
   PCAP="$HERE/logs/.live_$STAMP.fifo"
   mkfifo "$PCAP"
+  if [ ! -r /usr/bin/dumpcap ] || ! id -nG | tr ' ' '\n' | grep -qx wireshark; then
+    echo "NOTE: live capture needs your user in the 'wireshark' group:  sudo usermod -aG wireshark $USER  (then open a new terminal)"
+  fi
   wireshark -X "lua_script:$HERE/wireshark/hgs.lua" -k -i "$PCAP" >/dev/null 2>&1 &
   PIDS+=($!)
-  echo "wireshark started on $PCAP (the tap waits for it to open the pipe)"
+  echo "wireshark started on $PCAP (frames are buffered until it opens the pipe)"
 fi
 cleanup() { for p in "${PIDS[@]:-}"; do [ -n "$p" ] && kill "$p" 2>/dev/null || true; done; rm -f "$HERE"/logs/.live_*.fifo; }
 trap cleanup EXIT

@@ -25,6 +25,7 @@ import os
 import select
 import sys
 import termios
+import threading
 import time
 import tty
 
@@ -77,19 +78,45 @@ def slave_baud(slave_fd: int) -> int | None:
         return None
 
 
+def _is_fifo(path: str) -> bool:
+    import stat
+    try:
+        return stat.S_ISFIFO(os.stat(path).st_mode)
+    except OSError:
+        return False
+
+
 class Logger:
     def __init__(self, path: str | None, idle_s: float, quiet: bool, pcap: str | None = None):
         self.fh = open(path, "a") if path else None
-        self.pcap = None
-        if pcap:
-            # a FIFO blocks here until Wireshark opens its end - that's intended
-            self.pcap = pcapng.Writer(open(pcap, "wb"))
-        self.wall0 = time.time()
         self.idle = idle_s
         self.quiet = quiet
         self.t0 = time.monotonic()
+        self.wall0 = time.time()
         self.buf = {">>": bytearray(), "<<": bytearray()}
         self.last = {">>": 0.0, "<<": 0.0}
+        self.pcap = None
+        self.pcap_pending: list[tuple[int, bytes, int]] = []
+        if pcap:
+            if _is_fifo(pcap):
+                # opening a FIFO for writing blocks until a reader (Wireshark)
+                # connects; do that in a thread so the bridge starts right away
+                # and buffer frames until then
+                threading.Thread(target=self._open_pcap, args=(pcap,), daemon=True).start()
+            else:
+                self.pcap = pcapng.Writer(open(pcap, "wb"))
+
+    def _open_pcap(self, path: str) -> None:
+        try:
+            w = pcapng.Writer(open(path, "wb"))
+        except OSError as e:
+            print(f"-- pcap {path}: {e}; continuing without pcapng", flush=True)
+            return
+        for ifid, data, ts in self.pcap_pending:
+            w.frame(ifid, data, ts)
+        self.pcap_pending = []
+        self.pcap = w
+        print("-- pcap reader connected", flush=True)
 
     def add(self, tag: str, data: bytes) -> None:
         now = time.monotonic()
@@ -111,12 +138,15 @@ class Logger:
         self.buf[tag].clear()
         ms = int((self.last[tag] - self.t0) * 1000)
         line = "[%8d ms] %s %s" % (ms, tag, " ".join("%02x" % b for b in data))
+        ifid = pcapng.IF_PROGRAM if tag == ">>" else pcapng.IF_DEVICE
+        ts = int((self.wall0 + self.last[tag] - self.t0) * 1_000_000)
         if self.pcap:
-            ifid = pcapng.IF_PROGRAM if tag == ">>" else pcapng.IF_DEVICE
             try:
-                self.pcap.frame(ifid, data, int((self.wall0 + self.last[tag] - self.t0) * 1_000_000))
+                self.pcap.frame(ifid, data, ts)
             except BrokenPipeError:
                 self.pcap = None  # Wireshark closed the fifo; keep bridging
+        elif self.pcap_pending is not None and len(self.pcap_pending) < 10000:
+            self.pcap_pending.append((ifid, data, ts))
         if self.fh:
             self.fh.write(line + "\n")
             self.fh.flush()
@@ -136,14 +166,6 @@ class Logger:
                 self.pcap.close()
             except OSError:
                 pass
-
-
-def _is_fifo(path: str) -> bool:
-    import stat
-    try:
-        return stat.S_ISFIFO(os.stat(path).st_mode)
-    except OSError:
-        return False
 
 
 def main() -> int:

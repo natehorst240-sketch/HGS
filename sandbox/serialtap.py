@@ -163,6 +163,9 @@ def main() -> int:
     args = ap.parse_args()
 
     prog_master, prog_slave, prog_path = new_pty()
+    # a fresh pty reports 38400; start it at the requested rate so the baud
+    # mirror only reacts to changes the program actually makes
+    set_raw_8n1(prog_slave, args.baud)
     if args.virtual:
         far_fd, peer_slave, peer_path = new_pty()
         print(f"virtual null-modem: program side {prog_path}  <->  peer side {peer_path}", flush=True)

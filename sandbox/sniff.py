@@ -190,7 +190,8 @@ def run(stdscr, tail: Tail, use_decode: bool):
             curses.noecho(); curses.curs_set(0)
             sel = None
         elif k == ord("w"):
-            out = os.path.splitext(tail.path)[0] + ".pcapng"
+            # never the tap's own live .pcapng (same stem): use a distinct export name
+            out = os.path.splitext(tail.path)[0] + time.strftime("_export_%H%M%S") + ".pcapng"
             with open(out, "wb") as fh:
                 wr = pcapng.Writer(fh)
                 base = int(time.time() * 1_000_000)

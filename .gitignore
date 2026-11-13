@@ -19,3 +19,6 @@ firmware/arduino/test/replay_test.exe
 *.lck
 _autosave-*
 fp-info-cache
+
+# sandbox serial captures
+sandbox/logs/

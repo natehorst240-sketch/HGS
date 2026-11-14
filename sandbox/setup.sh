@@ -86,14 +86,14 @@ SYS32="$WINEPREFIX/drive_c/windows/system32"
 for f in "${DLL[@]:-}"; do
   [ -n "$f" ] || continue
   [ -f "$f" ] || { echo "no such file: $f" >&2; exit 1; }
-  cp -f "$f" "$SYS32/$(basename "$f")"
+  cp -f --no-preserve=mode "$f" "$SYS32/$(basename "$f")"
   echo "dll  -> system32/$(basename "$f")"
 done
 for f in "${OCX[@]:-}"; do
   [ -n "$f" ] || continue
   [ -f "$f" ] || { echo "no such file: $f" >&2; exit 1; }
   b=$(basename "$f")
-  cp -f "$f" "$SYS32/$b"
+  cp -f --no-preserve=mode "$f" "$SYS32/$b"
   if wine regsvr32 /s "C:\\windows\\system32\\$b" 2>/dev/null; then
     echo "ocx  -> system32/$b registered"
   else
@@ -105,7 +105,9 @@ DEST="$WINEPREFIX/drive_c/Program Files/$NAME"
 if [ -n "$DIR" ]; then
   [ -d "$DIR" ] || { echo "no such folder: $DIR" >&2; exit 1; }
   mkdir -p "$DEST"
-  cp -r "$DIR/." "$DEST/"
+  # files on /mnt/c arrive read-only; --no-preserve so a re-run can overwrite them
+  [ -d "$DEST" ] && chmod -R u+w "$DEST" 2>/dev/null
+  cp -r --no-preserve=mode "$DIR/." "$DEST/"
   echo "installed folder -> $DEST"
   exe=$(find "$DEST" -maxdepth 2 -iname '*.exe' | head -1)
   [ -n "$exe" ] && echo "run it:   sandbox/run.sh --name $NAME --sim|--tap DEV|--trace \"$exe\""

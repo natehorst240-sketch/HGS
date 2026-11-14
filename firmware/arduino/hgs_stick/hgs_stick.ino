@@ -5,7 +5,11 @@
 // to the TF card. Plugged into any PC afterwards it enumerates as an ordinary
 // USB flash drive - no drivers, no software.
 //
-// Hold the screen ~1.5 s during a download to abort.
+// The screen mirrors the Linux app (hgs/ui.py): an IDS menu with the three
+// read-only downloads the DAU accepts, and a Data View that decodes a stored
+// .HG6 on the stick (Cumulative, Fault, AFCS Fault, Power Assurance, Time
+// History summary). Hold the screen ~1.5 s during a download to abort, or on a
+// Data View page to go back.
 //
 // Libraries: Arduino_GFX (moononournation). Board: "ESP32S3 Dev Module",
 // PSRAM enabled (OPI), USB Mode "USB-OTG (TinyUSB)", USB CDC On Boot enabled.
@@ -19,6 +23,7 @@
 #include "config.h"
 #include "cst816.h"
 #include "dau_protocol.h"
+#include "hg6.h"
 #include "stick_log.h"
 #include "storage.h"
 #include "ui.h"
@@ -142,11 +147,9 @@ static void goToSleep(bool logIt) {
   gpio_hold_en((gpio_num_t)PIN_TP_RST);
   gpio_hold_en((gpio_num_t)PIN_LCD_BL);
   gpio_deep_sleep_hold_en();
-#ifdef ESP_EXT1_WAKEUP_ANY_LOW
+  // ANY_LOW is the name the S3 core supports (ALL_LOW is ESP32-only and now
+  // deprecated; the two share a value, so behaviour is unchanged).
   esp_sleep_enable_ext1_wakeup(1ULL << PIN_TP_INT, ESP_EXT1_WAKEUP_ANY_LOW);
-#else
-  esp_sleep_enable_ext1_wakeup(1ULL << PIN_TP_INT, ESP_EXT1_WAKEUP_ALL_LOW);
-#endif
   esp_deep_sleep_start();               // wakes as a cold boot -> setup() again
 }
 
@@ -167,13 +170,39 @@ static void requireWakeHold() {
   touch.waitRelease();
 }
 
-static bool waitTouchOrSleep() {
-  if (IDLE_SLEEP_MS == 0) {
-    touch.waitTouch();
-  } else if (!touch.waitTouch(IDLE_SLEEP_MS)) {
-    enterSleep();                       // does not return
+// Portrait touch coordinates -> landscape screen coordinates (see config.h).
+static void toScreen(int tx, int ty, int& sx, int& sy) {
+  sx = ty;
+  sy = tx;
+  if (TOUCH_FLIP_X) sx = ui::width() - 1 - sx;
+  if (TOUCH_FLIP_Y) sy = ui::height() - 1 - sy;
+}
+
+// Wait for a tap; returns false if the screen was HELD instead (back/cancel).
+// Sleeps on idle when IDLE_SLEEP_MS is set. Fills the tap's screen position.
+static bool waitTapOrSleep(int& sx, int& sy) {
+  int tx = 0, ty = 0;
+  const uint32_t t0 = millis();
+  while (!touch.read(tx, ty)) {
+    if (IDLE_SLEEP_MS && millis() - t0 > IDLE_SLEEP_MS) enterSleep();   // no return
+    delay(20);
+  }
+  toScreen(tx, ty, sx, sy);
+  Serial.printf("tap raw=(%d,%d) screen=(%d,%d)\n", tx, ty, sx, sy);
+  // Tap or hold? Held past ABORT_HOLD_MS means "back".
+  const uint32_t down = millis();
+  bool held = false;
+  while (touch.touched()) {
+    if (millis() - down >= ABORT_HOLD_MS) held = true;
+    delay(20);
   }
   touch.waitRelease();
+  return !held;
+}
+
+static bool waitTouchOrSleep() {
+  int sx, sy;
+  waitTapOrSleep(sx, sy);
   return true;
 }
 
@@ -194,11 +223,11 @@ static void watchdogStart() {
 static void watchdogStop() { esp_task_wdt_delete(NULL); }
 
 // --- the download -------------------------------------------------------------
-static void runDownload() {
+static void runDownload(const char* command, char typeLetter) {
   const int batt = batteryPct();
   char msg[96];
-  snprintf(msg, sizeof(msg), "download requested batt=%d%% free=%luKB",
-           batt, (unsigned long)storage::freeKb());
+  snprintf(msg, sizeof(msg), "%s requested batt=%d%% free=%luKB",
+           command, batt, (unsigned long)storage::freeKb());
   stick_log::line(msg);
 
   if (batt >= 0 && batt < LOW_BATT_PCT) {
@@ -276,7 +305,7 @@ static void runDownload() {
   ui::bar(0);
 
   watchdogStart();
-  const dau::Result r = dl.download(dau::CMD_DOWNLOAD_LOGS);
+  const dau::Result r = dl.download(command);
   watchdogStop();
   sink.close();
 
@@ -292,7 +321,7 @@ static void runDownload() {
     ui::bar(100);
     saveCal(el);
     char finalName[48];
-    if (!storage::finalise(part, finalName, sizeof(finalName))) {
+    if (!storage::finalise(part, typeLetter, finalName, sizeof(finalName))) {
       snprintf(finalName, sizeof(finalName), "%s", part);
     }
     snprintf(msg, sizeof(msg), "download OK %u bytes in %lus -> %s",
@@ -392,24 +421,199 @@ void setup() {
                    (unsigned long)storage::freeKb(), storage::downloadCount());
 }
 
+// --- Data View ------------------------------------------------------------------
+// Decodes a stored .HG6 into the same sections the Linux app shows as tabs.
+// The file is read whole into PSRAM (a download is ~590 KB; the S3R8 has 8 MB).
+static const size_t VIEW_BUF_MAX = 1024 * 1024;
+static hg6::Parsed parsed;              // ~20 KB, lives in .bss
+
+struct Section { const char* name; int rows; int perPage; };
+
+static void thSummaryLines(char (*l)[34], char (*r)[22], int& n) {
+  const hg6::ThSummary& t = parsed.th;
+  n = 0;
+  snprintf(l[n], 34, "Frames in file");     snprintf(r[n], 22, "%d", t.frames);          n++;
+  snprintf(l[n], 34, "Frames with data");   snprintf(r[n], 22, "%d", t.framesWithData);  n++;
+  snprintf(l[n], 34, "Samples (1 Hz)");     snprintf(r[n], 22, "%d", t.samples);         n++;
+  snprintf(l[n], 34, "First sample");       snprintf(r[n], 22, "%s", t.first);           n++;
+  snprintf(l[n], 34, "Last sample");        snprintf(r[n], 22, "%s", t.last);            n++;
+  snprintf(l[n], 34, "Full table: open on PC"); r[n][0] = 0;                              n++;
+}
+
+// Renders page `pg` (0-based, across all sections). Returns total page count.
+static int renderViewPage(const char* file, int pg) {
+  static char l[ui::TABLE_ROWS][34], r[ui::TABLE_ROWS][22];
+  static const char* lp[ui::TABLE_ROWS];
+  static const char* rp[ui::TABLE_ROWS];
+  for (int i = 0; i < ui::TABLE_ROWS; ++i) { l[i][0] = r[i][0] = 0; lp[i] = l[i]; rp[i] = r[i]; }
+
+  int nFault = 0, nAfcs = 0;
+  for (int i = 0; i < parsed.nev; ++i) (parsed.ev[i].afcs ? nAfcs : nFault)++;
+
+  // Same order as the Linux app's Data View menu.
+  const Section sec[] = {
+    {"Exceedance Log",      1,                     1},
+    {"Fault Log",           nFault ? nFault : 1,   3},   // 2 lines per event
+    {"Cumulative Log",      parsed.ncum ? parsed.ncum : 1, ui::TABLE_ROWS},
+    {"Time History Log",    1,                     1},
+    {"Power Assurance Log", parsed.npa ? parsed.npa : 1, 1},   // 1 record per page
+    {"AFCS Fault Log",      nAfcs ? nAfcs : 1,     3},
+  };
+  const int nsec = sizeof(sec) / sizeof(sec[0]);
+  int total = 0, first[8];
+  for (int i = 0; i < nsec; ++i) { first[i] = total; total += (sec[i].rows + sec[i].perPage - 1) / sec[i].perPage; }
+  if (pg < 0) pg = 0;
+  if (pg >= total) pg = total - 1;
+  int si = 0;
+  while (si + 1 < nsec && pg >= first[si + 1]) si++;
+  const int local = pg - first[si];
+  const int start = local * sec[si].perPage;
+  int n = 0;
+
+  switch (si) {
+    case 0:
+      snprintf(l[0], 34, "%d parameters in catalog", parsed.params);
+      snprintf(l[1], 34, "NO EXCEEDINGS ARE AVAILABLE");
+      snprintf(l[2], 34, "(event layout not decoded)");
+      n = 3;
+      break;
+    case 1: case 5: {
+      const bool afcs = (si == 5);
+      int k = 0;
+      for (int i = 0; i < parsed.nev && n + 1 < ui::TABLE_ROWS; ++i) {
+        if (parsed.ev[i].afcs != afcs) continue;
+        if (k++ < start) continue;
+        const hg6::Event& e = parsed.ev[i];
+        snprintf(l[n], 34, "%s", e.label);  snprintf(r[n], 22, "%s", e.first);  n++;
+        snprintf(l[n], 34, "   last / count");
+        snprintf(r[n], 22, "%s x%d", e.last[0] ? e.last : "-", e.count);  n++;
+      }
+      if (n == 0) { snprintf(l[0], 34, afcs ? "NO AFCSFAULTS ARE AVAILABLE" : "NO FAULTS ARE AVAILABLE"); n = 1; }
+      break;
+    }
+    case 2:
+      for (int i = start; i < parsed.ncum && n < ui::TABLE_ROWS; ++i, ++n) {
+        snprintf(l[n], 34, "%.29s", parsed.cum[i].item);
+        snprintf(r[n], 22, "%s", parsed.cum[i].value);
+      }
+      if (n == 0) { snprintf(l[0], 34, "NO CUMULATIVES LOG DATA"); n = 1; }
+      break;
+    case 3:
+      thSummaryLines(l, r, n);
+      break;
+    case 4:
+      if (parsed.npa) {
+        const hg6::PaRow& p = parsed.pa[start];
+        snprintf(l[0], 34, "%s", p.col[0]);
+        snprintf(r[0], 22, "%d / %d", start + 1, parsed.npa);
+        snprintf(l[1], 34, "OAT %sC  Pa %s ft  IAS %s kt", p.col[1], p.col[2], p.col[3]);
+        snprintf(l[2], 34, "       N2   TRQ  TOT   N1 IDLE MAN");
+        snprintf(l[3], 34, "Eng1 %4s  %4s %4s %5s %4s %3s", p.col[4], p.col[5], p.col[6], p.col[7], p.col[8], p.col[9]);
+        snprintf(l[4], 34, "Eng2 %4s  %4s %4s %5s %4s %3s", p.col[10], p.col[11], p.col[12], p.col[13], p.col[14], p.col[15]);
+        n = 5;
+      } else {
+        snprintf(l[0], 34, "NO POWER ASSURANCE LOG DATA"); n = 1;
+      }
+      break;
+  }
+
+  char caption[64], footer[48];
+  snprintf(caption, sizeof(caption), "%s  %d/%d  %.22s", sec[si].name, pg + 1, total, file + 1);
+  snprintf(footer, sizeof(footer), "< tap left   tap right >   hold = back");
+  ui::table(caption, lp, rp, n, footer);
+  return total;
+}
+
+static void viewFile(const char* path) {
+  ui::screen("DATA VIEW", "reading file...", "", path + 1);
+  uint8_t* buf = (uint8_t*)ps_malloc(VIEW_BUF_MAX);
+  if (!buf) buf = (uint8_t*)malloc(VIEW_BUF_MAX);
+  if (!buf) {
+    ui::screen("DATA VIEW", "Out of memory", "", "", "tap = back", ui::BLACK, ui::RED);
+    waitTouchOrSleep();
+    return;
+  }
+  size_t got = 0;
+  const bool complete = storage::readAll(path, buf, VIEW_BUF_MAX, got);
+  if (got == 0) {
+    free(buf);
+    ui::screen("DATA VIEW", "Cannot read file", "", path + 1, "tap = back", ui::BLACK, ui::RED);
+    waitTouchOrSleep();
+    return;
+  }
+  hg6::parse(buf, got, parsed);
+  free(buf);
+  stick_log::linef("view %s: %u bytes%s params=%d cum=%d ev=%d pa=%d th=%d/%d",
+                   path, (unsigned)got, complete ? "" : " (truncated)", parsed.params,
+                   parsed.ncum, parsed.nev, parsed.npa, parsed.th.samples, parsed.th.frames);
+
+  int pg = 0;
+  for (;;) {
+    const int total = renderViewPage(path, pg);
+    int sx, sy;
+    if (!waitTapOrSleep(sx, sy)) return;             // held = back to file list
+    if (sx >= ui::width() / 2) { if (pg + 1 < total) pg++; }
+    else if (pg > 0) pg--;
+  }
+}
+
+static void dataView() {
+  static char names[16][storage::NAME_LEN];
+  const int n = storage::listDownloads(names, 16);
+  if (n == 0) {
+    ui::screen("DATA VIEW", "No downloads stored", "", "", "tap = back");
+    waitTouchOrSleep();
+    return;
+  }
+  int page = 0;
+  for (;;) {
+    const int pages = (n + ui::MENU_ROWS - 1) / ui::MENU_ROWS;
+    const char* items[ui::MENU_ROWS];
+    int shown = 0;
+    for (int i = page * ui::MENU_ROWS; i < n && shown < ui::MENU_ROWS; ++i) items[shown++] = names[i] + 1;
+    char caption[48];
+    snprintf(caption, sizeof(caption), "Open Log File  (%d/%d)", page + 1, pages);
+    ui::menu(caption, items, shown, "tap a file   footer: < page >   hold = back");
+    int sx, sy;
+    if (!waitTapOrSleep(sx, sy)) return;
+    if (ui::inFooter(sy)) {
+      if (sx >= ui::width() / 2) { if (page + 1 < pages) page++; }
+      else if (page > 0) page--;
+      continue;
+    }
+    const int row = ui::menuRowAt(sy);
+    if (row >= 0 && row < shown) viewFile(names[page * ui::MENU_ROWS + row]);
+  }
+}
+
+// --- main menu --------------------------------------------------------------------
 void loop() {
   ui::bar(0, false);
-  char power[16], l2[28], l3[28];
+  char power[16], caption[48], hint[48];
   powerLabel(power, sizeof(power));
-  snprintf(l2, sizeof(l2), "%s  free %luMB", power,
-           (unsigned long)(storage::freeBytes() / (1024 * 1024)));
+  snprintf(caption, sizeof(caption), "COM_1: STAND BY READY   %s", power);
   // A watchdog reset, panic or brownout last time is worth surfacing on the
   // ready screen - the maintainer should not have to open syslog.txt to find out.
   if (stick_log::priorSessionFaulted()) {
-    snprintf(l3, sizeof(l3), "! prev: %s", stick_log::resetReason());
+    snprintf(hint, sizeof(hint), "! prev: %s", stick_log::resetReason());
   } else {
-    snprintf(l3, sizeof(l3), "%d download(s) stored", storage::downloadCount());
+    snprintf(hint, sizeof(hint), "%d download(s)   free %luMB   tap an item",
+             storage::downloadCount(), (unsigned long)(storage::freeBytes() / (1024 * 1024)));
   }
 
-  ui::screen("COM_1: STAND BY READY", "COM_2: - NOT AVAILABLE -", l2, l3,
-             "Tap screen to download");
+  // Same entries as the Linux app's IDS menu plus its Data View.
+  static const char* const items[ui::MENU_ROWS] = {
+    "Download Logs", "Download Cumulative", "IDS Status Download", "Data View",
+  };
+  ui::menu(caption, items, ui::MENU_ROWS, hint);
 
-  waitTouchOrSleep();
-  runDownload();
-  waitTouchOrSleep();                   // hold the result until acknowledged
+  int sx, sy;
+  if (!waitTapOrSleep(sx, sy)) return;             // a hold on the menu does nothing
+  switch (ui::menuRowAt(sy)) {
+    case 0: runDownload(dau::CMD_DOWNLOAD_LOGS, 'A');       waitTouchOrSleep(); break;
+    case 1: runDownload(dau::CMD_DOWNLOAD_CUMULATIVE, 'C'); waitTouchOrSleep(); break;
+    case 2: runDownload(dau::CMD_DOWNLOAD_STATUS, 'S');     waitTouchOrSleep(); break;
+    case 3: dataView(); break;
+    default: break;
+  }
 }

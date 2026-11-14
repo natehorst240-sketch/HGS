@@ -36,4 +36,23 @@ void panel(const char* l0, const char* l1 = "", const char* l2 = "",
 // Progress bar. Only the columns that actually changed are redrawn.
 void bar(int pct, bool visible = true);
 
+// Menu: title bar, a caption where "Hgs Status:" normally sits, up to 4
+// tappable rows in the panel (same rows as the status lines), and a hint.
+// Mirrors the Linux app's IDS / Data View menus.
+static const int MENU_ROWS = 4;
+void menu(const char* caption, const char* const* items, int n, const char* hint,
+          int highlight = -1);
+
+// Data View page: caption, up to 6 small-font rows of left/right text, footer.
+// `right` may be null for rows that are a single left-aligned line.
+static const int TABLE_ROWS = 6;
+void table(const char* caption, const char* const* left, const char* const* right,
+           int n, const char* footer);
+
+// Which menu row a screen y lands on (-1 = none); true if y is in the hint band.
+int  menuRowAt(int sy);
+bool inFooter(int sy);
+int  width();
+int  height();
+
 }  // namespace ui

@@ -97,4 +97,58 @@ void bar(int pct, bool visible) {
   barLast = fill;
 }
 
+int width()  { return W; }
+int height() { return H; }
+
+int menuRowAt(int sy) {
+  for (int i = 0; i < MENU_ROWS; ++i) {
+    const int top = LINE_Y + i * LINE_DY - 3;
+    if (sy >= top && sy < top + LINE_DY) return i;
+  }
+  return -1;
+}
+
+bool inFooter(int sy) { return sy >= BAR_Y - 4; }
+
+void menu(const char* caption, const char* const* items, int n, const char* hint,
+          int highlight) {
+  gfx->fillScreen(BG);
+  titleBar();
+  text(caption, 10, 32, BLACK, BG, 1);
+  gfx->fillRect(PANEL_X, PANEL_Y, PANEL_W, PANEL_H, WHITE);
+  gfx->fillRect(PANEL_X, PANEL_Y, PANEL_W, 2, SHADOW);
+  gfx->fillRect(PANEL_X, PANEL_Y, 2, PANEL_H, SHADOW);
+  for (int i = 0; i < n && i < MENU_ROWS; ++i) {
+    const int y = LINE_Y + i * LINE_DY;
+    const bool hi = (i == highlight);
+    if (hi) gfx->fillRect(PANEL_X + 2, y - 3, PANEL_W - 2, LINE_DY, NAVY);
+    text(items[i], LINE_X, y, hi ? WHITE : BLACK, hi ? NAVY : WHITE, 2);
+  }
+  barLast = -1;
+  if (hint && hint[0]) text(hint, centreX(hint, 1), HINT_Y, BLACK, BG, 1);
+}
+
+void table(const char* caption, const char* const* left, const char* const* right,
+           int n, const char* footer) {
+  static const int ROW_DY = 13;
+  static const int ROW_Y0 = PANEL_Y + 5;
+  static const int RIGHT_EDGE = PANEL_X + PANEL_W - 6;
+  gfx->fillScreen(BG);
+  titleBar();
+  text(caption, 10, 32, BLACK, BG, 1);
+  gfx->fillRect(PANEL_X, PANEL_Y, PANEL_W, PANEL_H, WHITE);
+  gfx->fillRect(PANEL_X, PANEL_Y, PANEL_W, 2, SHADOW);
+  gfx->fillRect(PANEL_X, PANEL_Y, 2, PANEL_H, SHADOW);
+  for (int i = 0; i < n && i < TABLE_ROWS; ++i) {
+    const int y = ROW_Y0 + i * ROW_DY;
+    if (left && left[i] && left[i][0]) text(left[i], LINE_X - 4, y, BLACK, WHITE, 1);
+    if (right && right[i] && right[i][0]) {
+      const int x = RIGHT_EDGE - (int)strlen(right[i]) * 6;     // right-aligned
+      text(right[i], x, y, NAVY, WHITE, 1);
+    }
+  }
+  barLast = -1;
+  if (footer && footer[0]) text(footer, centreX(footer, 1), HINT_Y - 10, BLACK, BG, 1);
+}
+
 }  // namespace ui

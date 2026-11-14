@@ -344,7 +344,7 @@ static bool hgsBasename(const char* partPath, char* out, size_t outLen) {
   return found;
 }
 
-bool finalise(const char* partPath, char* out, size_t outLen) {
+bool finalise(const char* partPath, char typeLetter, char* out, size_t outLen) {
   char base[32];
   if (!hgsBasename(partPath, base, sizeof(base))) {
     // strip ".PART"
@@ -354,10 +354,52 @@ bool finalise(const char* partPath, char* out, size_t outLen) {
     return vol->rename(partPath, out);
   }
   for (int n = 1; n < 100; ++n) {
-    snprintf(out, outLen, "/%s_A%d.HG6", base, n);
+    snprintf(out, outLen, "/%s_%c%d.HG6", base, typeLetter, n);
     if (!vol->exists(out)) return vol->rename(partPath, out);
   }
   return false;
+}
+
+int listDownloads(char (*names)[NAME_LEN], int maxNames) {
+  if (!mounted() || maxNames <= 0) return 0;
+  File root = vol->open("/");
+  if (!root) return 0;
+  int n = 0;
+  for (File f = root.openNextFile(); f; f = root.openNextFile()) {
+    const char* nm = f.name();
+    if (nm[0] == '/') nm++;                       // core versions differ here
+    if (endsWithNoCase(nm, ".HG6")) {
+      char cand[NAME_LEN];
+      snprintf(cand, sizeof(cand), "/%s", nm);
+      // insertion sort, descending, so the newest SSSSS_YYMMDD name is first
+      int pos = n < maxNames ? n : maxNames - 1;
+      if (n >= maxNames && strcmp(cand, names[pos]) <= 0) { f.close(); continue; }
+      while (pos > 0 && strcmp(cand, names[pos - 1]) > 0) {
+        memcpy(names[pos], names[pos - 1], NAME_LEN);
+        pos--;
+      }
+      memcpy(names[pos], cand, NAME_LEN);
+      if (n < maxNames) n++;
+    }
+    f.close();
+  }
+  root.close();
+  return n;
+}
+
+bool readAll(const char* path, uint8_t* buf, size_t maxLen, size_t& got) {
+  got = 0;
+  if (!mounted()) return false;
+  File f = vol->open(path, FILE_READ);
+  if (!f) return false;
+  while (got < maxLen) {
+    const size_t n = f.read(buf + got, maxLen - got);
+    if (n == 0) break;
+    got += n;
+  }
+  const bool complete = (f.available() == 0);
+  f.close();
+  return complete;
 }
 
 void removeFile(const char* path) { if (mounted()) vol->remove(path); }

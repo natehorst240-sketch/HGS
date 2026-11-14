@@ -17,8 +17,25 @@ CAPTURE  ?= ../../wire_test.HG6
 SRC = replay_test.cpp ../hgs_stick/dau_protocol.cpp
 BIN = replay_test
 
-.PHONY: all run asan clean
-all: run
+# .HG6 decoder gate: the C++ port must print exactly what the Python parser
+# prints for every sample download in sample-data/.
+HG6_SRC  = hg6_test.cpp ../hgs_stick/hg6.cpp
+HG6_BIN  = hg6_test
+SAMPLES ?= $(wildcard ../../../sample-data/*.HG6)
+
+.PHONY: all run hg6 asan clean
+all: run hg6
+
+$(HG6_BIN): $(HG6_SRC) ../hgs_stick/hg6.h
+	$(CXX) $(CXXFLAGS) -o $(HG6_BIN) $(HG6_SRC)
+
+hg6: $(HG6_BIN)
+	@for f in $(SAMPLES); do \
+	  python3 hg6_expected.py $$f > expected.txt; \
+	  ./$(HG6_BIN) $$f > actual.txt; \
+	  if diff -u expected.txt actual.txt; then echo "PASS hg6 $$f"; else echo "FAIL hg6 $$f"; exit 1; fi; \
+	done
+	@rm -f expected.txt actual.txt
 
 $(BIN): $(SRC) ../hgs_stick/dau_protocol.h
 	$(CXX) $(CXXFLAGS) -o $(BIN) $(SRC)
@@ -35,4 +52,4 @@ asan:
 	./$(BIN)_asan $(CAPTURE)
 
 clean:
-	rm -f $(BIN) $(BIN).exe $(BIN)_asan $(BIN)_asan.exe
+	rm -f $(BIN) $(BIN).exe $(BIN)_asan $(BIN)_asan.exe $(HG6_BIN) $(HG6_BIN).exe expected.txt actual.txt

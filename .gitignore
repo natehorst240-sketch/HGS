@@ -9,7 +9,10 @@ __pycache__/
 
 # build output
 .pio/
+firmware/arduino/test/replay_test
 firmware/arduino/test/replay_test.exe
+firmware/arduino/test/hg6_test
+firmware/arduino/test/hg6_test.exe
 *.o
 
 # KiCad autosaves, backups, locks

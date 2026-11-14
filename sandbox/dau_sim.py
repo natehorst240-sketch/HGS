@@ -84,10 +84,17 @@ def write_all(fd: int, data: bytes, byte_delay: float = 0.0) -> None:
                 n = os.write(fd, view[:1024])
                 view = view[n:]
         return
-    for i in range(0, len(data), 32):
+    # one byte per character time, like a UART: the receiver sees the same
+    # trickle it would see on the wire (HGS reads a "description" first and
+    # then waits for the rest of the frame, so batching confuses it)
+    nxt = time.monotonic()
+    for i in range(len(data)):
         _, w, _ = select.select([], [fd], [], 1.0)
-        os.write(fd, data[i:i + 32])
-        time.sleep(byte_delay * 32)
+        os.write(fd, data[i:i + 1])
+        nxt += byte_delay
+        rem = nxt - time.monotonic()
+        if rem > 0:
+            time.sleep(rem)
 
 
 def wait_message(fd: int, buf: bytearray, timeout: float | None) -> bytes | None:

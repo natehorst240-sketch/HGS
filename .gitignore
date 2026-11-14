@@ -22,3 +22,6 @@ fp-info-cache
 
 # sandbox serial captures
 sandbox/logs/
+
+# built pty shim
+sandbox/ptymodem/*.so

@@ -117,6 +117,23 @@ elif [ -n "$EXE" ]; then
   echo "run it:   sandbox/run.sh --name $NAME --sim|--tap DEV|--trace \"$DEST/$(basename "$EXE")\""
 fi
 
+# Build the pty modem-line shim (see ptymodem/ptymodem.c): Wine cancels its
+# serial event wait when TIOCMGET fails, which it does on the tap's pty, so
+# MSCOMM32-style programs never receive anything without it. 32-bit Wine
+# processes need the 32-bit build (gcc-multilib).
+HERE=$(cd "$(dirname "$0")" && pwd)
+if command -v gcc >/dev/null; then
+  ( cd "$HERE/ptymodem" && gcc -shared -fPIC -O2 -o ptymodem64.so ptymodem.c -ldl ) \
+    && echo "ptymodem64.so built" || echo "warning: ptymodem64.so failed to build"
+  if ( cd "$HERE/ptymodem" && gcc -m32 -shared -fPIC -O2 -o ptymodem32.so ptymodem.c -ldl 2>/dev/null ); then
+    echo "ptymodem32.so built"
+  else
+    echo "NOTE: 32-bit shim not built. 32-bit Wine needs it for COM ports on the tap:  sudo apt install gcc-multilib  then re-run setup"
+  fi
+else
+  echo "NOTE: gcc not found; serial via the tap/simulator will not work until:  sudo apt install build-essential gcc-multilib  then re-run setup"
+fi
+
 # Port mapping is read when the prefix boots, so make sure the next run starts fresh.
 wineserver -k 2>/dev/null || true
 echo "done. WINEPREFIX=$WINEPREFIX"

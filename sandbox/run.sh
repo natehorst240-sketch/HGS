@@ -81,6 +81,21 @@ elif [ "$SIM" = 1 ]; then
   echo "simulated DAU on $(cat "$PEER"); log -> $LOG"
 fi
 
+# Wine on a pseudo-terminal needs the modem-line shim or it never delivers
+# received bytes (see ptymodem/ptymodem.c). Preload whichever builds exist.
+if [ -n "$TAP" ] || [ "$SIM" = 1 ]; then
+  SHIMS=""
+  for so in "$HERE/ptymodem/ptymodem32.so" "$HERE/ptymodem/ptymodem64.so"; do
+    [ -f "$so" ] && SHIMS="$SHIMS${SHIMS:+ }$so"
+  done
+  if [ -n "$SHIMS" ]; then
+    export LD_PRELOAD="$SHIMS${LD_PRELOAD:+ $LD_PRELOAD}"
+    echo "pty modem shim: $SHIMS"
+  else
+    echo "WARNING: sandbox/ptymodem/*.so not built; run sandbox/setup.sh (needs gcc, gcc-multilib). Serial RX will not work." >&2
+  fi
+fi
+
 echo "starting: wine $EXE $*   (sandbox $NAME)"
 # Run from the exe's own folder: MFC apps expect their .ini/.dat beside them.
 cd "$(dirname "$EXE")"

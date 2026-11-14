@@ -117,6 +117,7 @@ def main() -> int:
     ap.add_argument("--file", default=os.path.join(os.path.dirname(__file__), "..", "sample-data", "22366_260707_A1.HG6"))
     ap.add_argument("--baud", type=int, default=9600)
     ap.add_argument("--pace", action="store_true", help="pace output at --baud even on a pty (realistic timing, ~10 min for a full file)")
+    ap.add_argument("--delay", type=float, default=0.0, help="ms to wait after a request/ack before sending the next record (DAU turnaround)")
     ap.add_argument("--once", action="store_true", help="exit after one complete download")
     args = ap.parse_args()
 
@@ -141,6 +142,8 @@ def main() -> int:
             i = 0
             while i < len(records):
                 rec = records[i]
+                if args.delay > 0:
+                    time.sleep(args.delay / 1000.0)
                 write_all(fd, rec, byte_delay)
                 sent += len(rec)
                 reply = wait_message(fd, buf, 30.0)

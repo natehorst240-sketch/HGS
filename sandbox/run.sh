@@ -4,6 +4,7 @@
 #   sandbox/run.sh [--name NAME] --tap /dev/ttyUSB0 [--baud 9600] PROGRAM.exe [args]  # real adapter, log everything
 #   sandbox/run.sh [--name NAME] --sim [--file X.HG6] [--pace] PROGRAM.exe [args]     # no hardware: dau_sim.py plays the DAU
 #       --pace streams records at real 9600-baud timing (a full file takes ~10 min) instead of instantly
+#       --delay MS waits MS after each request/ack before the next record (DAU turnaround, default 0)
 #   sandbox/run.sh [--name NAME] --trace PROGRAM.exe [args]                           # what does it touch? files/registry/DLLs/ports
 #   sandbox/run.sh [--name NAME] PROGRAM.exe [args]                                   # plain Wine
 #   --wireshark with --tap/--sim opens Wireshark live (HGS decode: sandbox/wireshark/hgs.lua).
@@ -18,7 +19,7 @@
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 
-NAME="hgs"; TAP=""; SIM=0; BAUD=9600; FILE=""; WS=0; TRACE=0; PACE=""
+NAME="hgs"; TAP=""; SIM=0; BAUD=9600; FILE=""; WS=0; TRACE=0; PACE=""; DELAY=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --name) NAME="$2"; shift 2 ;;
@@ -28,6 +29,7 @@ while [ $# -gt 0 ]; do
     --file) FILE="$2"; shift 2 ;;
     --wireshark) WS=1; shift ;;
     --pace) PACE="--pace"; shift ;;
+    --delay) DELAY="$2"; shift 2 ;;
     --trace) TRACE=1; shift ;;
     -h|--help) sed -n 2,16p "$0"; exit 0 ;;
     *) break ;;
@@ -74,7 +76,7 @@ elif [ "$SIM" = 1 ]; then
   PIDS+=($!)
   for _ in $(seq 1 50); do [ -s "$PEER" ] && break; sleep 0.1; done
   [ -s "$PEER" ] || { echo "serialtap did not come up" >&2; exit 1; }
-  python3 "$HERE/dau_sim.py" "$(cat "$PEER")" ${FILE:+--file "$FILE"} --baud "$BAUD" $PACE &
+  python3 "$HERE/dau_sim.py" "$(cat "$PEER")" ${FILE:+--file "$FILE"} --baud "$BAUD" $PACE --delay "$DELAY" &
   PIDS+=($!)
   echo "simulated DAU on $(cat "$PEER"); log -> $LOG"
 fi

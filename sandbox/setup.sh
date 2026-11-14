@@ -40,6 +40,17 @@ fi
 # Windows version the program sees (MFC-era apps are happiest on winxp).
 wine winecfg -v "$WINVER" >/dev/null 2>&1 || echo "warning: could not set Windows version to $WINVER"
 
+# Pin COM1 so Wine's own port detection can't steal it. Wine rebuilds every
+# dosdevices/comN link at start-up from /dev/ttyS*, /dev/ttyUSB*, ... (on WSL
+# that maps com1 -> root-owned /dev/ttyS0 = "Permission denied"), but a value
+# COM1 under HKLM\Software\Wine\Ports overrides detection for that number.
+# We point it at a stable link inside the prefix that setup.sh --com1 or
+# serialtap.py retargets at the real device / the tap's pty each run.
+STABLE="$WINEPREFIX/com1.serial"
+wine reg add 'HKLM\Software\Wine\Ports' /v COM1 /t REG_SZ /d "$STABLE" /f >/dev/null 2>&1 \
+  && echo "COM1 pinned to $STABLE (HKLM\\Software\\Wine\\Ports)" \
+  || echo "warning: could not write HKLM\\Software\\Wine\\Ports\\COM1"
+
 # Serial permissions: Wine opens the tty as your user, so you need the device's group.
 if [ -n "$COM1" ]; then
   if [ ! -e "$COM1" ]; then
@@ -50,9 +61,10 @@ if [ -n "$COM1" ]; then
       echo "NOTE: $COM1 is group '$grp' and you are not in it:  sudo usermod -aG $grp $USER  (then log out/in)"
     fi
   fi
+  ln -sfn "$COM1" "$STABLE"
   mkdir -p "$WINEPREFIX/dosdevices"
-  ln -sfn "$COM1" "$WINEPREFIX/dosdevices/com1"
-  echo "com1 -> $COM1"
+  ln -sfn "$STABLE" "$WINEPREFIX/dosdevices/com1"
+  echo "com1 -> $STABLE -> $COM1"
 fi
 
 # MSCOMM32.OCX: HGS drives the serial port through this ActiveX control, which is
@@ -79,4 +91,6 @@ if [ -n "$EXE" ]; then
   echo "run it:   sandbox/run.sh --tap ${COM1:-/dev/ttyUSB0} \"$dest/$(basename "$EXE")\""
 fi
 
+# Port mapping is read when the prefix boots, so make sure the next run starts fresh.
+wineserver -k 2>/dev/null || true
 echo "done. WINEPREFIX=$WINEPREFIX"

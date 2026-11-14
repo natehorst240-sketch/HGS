@@ -23,6 +23,7 @@ from __future__ import annotations
 import argparse
 import os
 import select
+import signal
 import sys
 import termios
 import threading
@@ -200,19 +201,26 @@ def main() -> int:
         peer_slave = None
         print(f"program side {prog_path}  <->  {args.real} @ {args.baud} 8N1", flush=True)
 
-    link = None
+    links: list[str] = []
     if not args.no_link:
+        # Two links: the stable one that HKLM\Software\Wine\Ports\COMn names
+        # (setup.sh wrote it; Wine recreates dosdevices/comN from it at every
+        # start), and dosdevices/comN itself for a wineserver that is already up.
+        stable = os.path.join(args.prefix, f"com{args.com}.serial")
         dosdev = os.path.join(args.prefix, "dosdevices")
         os.makedirs(dosdev, exist_ok=True)
-        link = os.path.join(dosdev, f"com{args.com}")
-        if os.path.islink(link) or os.path.exists(link):
-            os.remove(link)
-        os.symlink(prog_path, link)
-        print(f"COM{args.com} in {args.prefix} -> {prog_path}", flush=True)
+        for link, target in ((stable, prog_path), (os.path.join(dosdev, f"com{args.com}"), stable)):
+            if os.path.islink(link) or os.path.exists(link):
+                os.remove(link)
+            os.symlink(target, link)
+            links.append(link)
+        print(f"COM{args.com} in {args.prefix} -> {stable} -> {prog_path}", flush=True)
 
     if args.pcap and not args.quiet:
         print(f"pcapng -> {args.pcap}" + ("  (waiting for a reader)" if _is_fifo(args.pcap) else ""), flush=True)
     log = Logger(args.log, args.idle / 1000.0, args.quiet, args.pcap)
+    # run.sh stops us with SIGTERM: route it through the same cleanup as Ctrl+C
+    signal.signal(signal.SIGTERM, lambda *_: (_ for _ in ()).throw(KeyboardInterrupt))
     cur_baud = args.baud
     last_baud_check = 0.0
     try:
@@ -244,8 +252,9 @@ def main() -> int:
         pass
     finally:
         log.close()
-        if link and os.path.islink(link):
-            os.remove(link)
+        for link in links:  # never leave COMn pointing at a recycled pty
+            if os.path.islink(link):
+                os.remove(link)
         for fd in (prog_master, prog_slave, far_fd, peer_slave):
             if fd is not None:
                 try:

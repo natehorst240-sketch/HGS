@@ -23,7 +23,7 @@ HG6_SRC  = hg6_test.cpp ../hgs_stick/hg6.cpp
 HG6_BIN  = hg6_test
 SAMPLES ?= $(wildcard ../../../sample-data/*.HG6)
 
-.PHONY: all run hg6 asan clean
+.PHONY: all run hg6 hg6-trunc asan clean
 all: run hg6
 
 $(HG6_BIN): $(HG6_SRC) ../hgs_stick/hg6.h
@@ -36,6 +36,12 @@ hg6: $(HG6_BIN)
 	  if diff -u expected.txt actual.txt; then echo "PASS hg6 $$f"; else echo "FAIL hg6 $$f"; exit 1; fi; \
 	done
 	@rm -f expected.txt actual.txt
+
+# Truncation sweep under the sanitizers: every prefix of every sample must
+# decode without reading out of bounds (a download cut off mid-section).
+hg6-trunc:
+	$(CXX) $(CXXFLAGS) -fsanitize=address,undefined -o $(HG6_BIN)_asan $(HG6_SRC)
+	@for f in $(SAMPLES); do ./$(HG6_BIN)_asan $$f --truncate || exit 1; done
 
 $(BIN): $(SRC) ../hgs_stick/dau_protocol.h
 	$(CXX) $(CXXFLAGS) -o $(BIN) $(SRC)
@@ -52,4 +58,4 @@ asan:
 	./$(BIN)_asan $(CAPTURE)
 
 clean:
-	rm -f $(BIN) $(BIN).exe $(BIN)_asan $(BIN)_asan.exe $(HG6_BIN) $(HG6_BIN).exe expected.txt actual.txt
+	rm -f $(BIN) $(BIN).exe $(BIN)_asan $(BIN)_asan.exe $(HG6_BIN) $(HG6_BIN).exe $(HG6_BIN)_asan expected.txt actual.txt

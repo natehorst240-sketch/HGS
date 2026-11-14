@@ -5,9 +5,23 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+
+// --truncate: decode every prefix of the file (all lengths through the catalog
+// and cumulative section, then the tail) and print nothing. Run under the
+// sanitizers, this proves a file cut off anywhere cannot read out of bounds.
+static int truncationSweep(const uint8_t* buf, size_t n) {
+  static hg6::Parsed p;
+  const size_t head = n < 40000 ? n : 40000;
+  for (size_t len = 0; len <= head; ++len) hg6::parse(buf, len, p);
+  const size_t tailFrom = n > 4000 ? n - 4000 : 0;
+  for (size_t len = tailFrom; len <= n; ++len) hg6::parse(buf, len, p);
+  printf("truncation sweep ok: %zu prefixes\n", head + 1 + (n - tailFrom + 1));
+  return 0;
+}
 
 int main(int argc, char** argv) {
-  if (argc < 2) { fprintf(stderr, "usage: hg6_test FILE.HG6\n"); return 2; }
+  if (argc < 2) { fprintf(stderr, "usage: hg6_test FILE.HG6 [--truncate]\n"); return 2; }
   FILE* f = fopen(argv[1], "rb");
   if (!f) { perror(argv[1]); return 2; }
   fseek(f, 0, SEEK_END);
@@ -16,6 +30,12 @@ int main(int argc, char** argv) {
   uint8_t* buf = (uint8_t*)malloc(n > 0 ? n : 1);
   if (fread(buf, 1, n, f) != (size_t)n) { perror("read"); return 2; }
   fclose(f);
+
+  if (argc > 2 && strcmp(argv[2], "--truncate") == 0) {
+    const int rc = truncationSweep(buf, (size_t)n);
+    free(buf);
+    return rc;
+  }
 
   static hg6::Parsed p;
   hg6::parse(buf, (size_t)n, p);

@@ -360,6 +360,32 @@ bool finalise(const char* partPath, char typeLetter, char* out, size_t outLen) {
   return false;
 }
 
+// Ordering for the Data View file list: newest download first. HGS names are
+// SSSSS_YYMMDD_An.HG6, so the date is the second field; comparing whole names
+// would order by aircraft serial instead and could push a fresh download off
+// the end of a capped list. Names without that shape (DOWNLOAD_NN.HG6) sort
+// after dated ones, by name.
+static bool dateKey(const char* name, const char** key) {
+  const char* p = strchr(name, '_');
+  if (!p) return false;
+  p++;
+  for (int i = 0; i < 6; ++i) if (!isdigit((unsigned char)p[i])) return false;
+  if (p[6] != '_') return false;
+  *key = p;
+  return true;
+}
+
+static bool newerFirst(const char* a, const char* b) {   // true if a before b
+  const char *ka, *kb;
+  const bool da = dateKey(a, &ka), db = dateKey(b, &kb);
+  if (da != db) return da;                               // dated names first
+  if (da) {
+    const int c = strncmp(ka, kb, 6);
+    if (c != 0) return c > 0;                            // later date first
+  }
+  return strcmp(a, b) > 0;                               // then by name, descending
+}
+
 int listDownloads(char (*names)[NAME_LEN], int maxNames) {
   if (!mounted() || maxNames <= 0) return 0;
   File root = vol->open("/");
@@ -371,10 +397,10 @@ int listDownloads(char (*names)[NAME_LEN], int maxNames) {
     if (endsWithNoCase(nm, ".HG6")) {
       char cand[NAME_LEN];
       snprintf(cand, sizeof(cand), "/%s", nm);
-      // insertion sort, descending, so the newest SSSSS_YYMMDD name is first
+      // insertion sort, newest first (see newerFirst); a full list drops the oldest
       int pos = n < maxNames ? n : maxNames - 1;
-      if (n >= maxNames && strcmp(cand, names[pos]) <= 0) { f.close(); continue; }
-      while (pos > 0 && strcmp(cand, names[pos - 1]) > 0) {
+      if (n >= maxNames && !newerFirst(cand, names[pos])) { f.close(); continue; }
+      while (pos > 0 && newerFirst(cand, names[pos - 1])) {
         memcpy(names[pos], names[pos - 1], NAME_LEN);
         pos--;
       }

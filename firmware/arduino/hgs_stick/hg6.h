@@ -30,22 +30,22 @@ struct Row {                 // Cumulative Log: Item / Value
 
 struct Event {               // Fault Log / AFCS Fault Log row
   char label[LABEL_LEN + 1];
-  char first[20];            // "2026-07-05 14:05:39"
-  char last[20];             // "" when never repeated
+  char first[28];            // "2026-07-05 14:05:39"
+  char last[28];             // "" when never repeated
   int  count;
   bool afcs;                 // label carries "FAIL CODE"
 };
 
 struct PaRow {               // Power Assurance Log row, same 16 columns as the app
-  char col[PA_COLS][20];
+  char col[PA_COLS][28];
 };
 
 struct ThSummary {
   int  frames;               // "TIME HISTORY #nnn" headers found
   int  framesWithData;       // frames whose first sample has a plausible timestamp
   int  samples;              // total 1 Hz rows
-  char first[20];            // first / last sample timestamps
-  char last[20];
+  char first[28];            // first / last sample timestamps
+  char last[28];
 };
 
 struct Parsed {

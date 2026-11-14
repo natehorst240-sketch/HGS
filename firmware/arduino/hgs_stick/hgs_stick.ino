@@ -429,20 +429,20 @@ static hg6::Parsed parsed;              // ~20 KB, lives in .bss
 
 struct Section { const char* name; int rows; int perPage; };
 
-static void thSummaryLines(char (*l)[34], char (*r)[22], int& n) {
+static void thSummaryLines(char (*l)[34], char (*r)[28], int& n) {
   const hg6::ThSummary& t = parsed.th;
   n = 0;
-  snprintf(l[n], 34, "Frames in file");     snprintf(r[n], 22, "%d", t.frames);          n++;
-  snprintf(l[n], 34, "Frames with data");   snprintf(r[n], 22, "%d", t.framesWithData);  n++;
-  snprintf(l[n], 34, "Samples (1 Hz)");     snprintf(r[n], 22, "%d", t.samples);         n++;
-  snprintf(l[n], 34, "First sample");       snprintf(r[n], 22, "%s", t.first);           n++;
-  snprintf(l[n], 34, "Last sample");        snprintf(r[n], 22, "%s", t.last);            n++;
+  snprintf(l[n], 34, "Frames in file");     snprintf(r[n], 28, "%d", t.frames);          n++;
+  snprintf(l[n], 34, "Frames with data");   snprintf(r[n], 28, "%d", t.framesWithData);  n++;
+  snprintf(l[n], 34, "Samples (1 Hz)");     snprintf(r[n], 28, "%d", t.samples);         n++;
+  snprintf(l[n], 34, "First sample");       snprintf(r[n], 28, "%s", t.first);           n++;
+  snprintf(l[n], 34, "Last sample");        snprintf(r[n], 28, "%s", t.last);            n++;
   snprintf(l[n], 34, "Full table: open on PC"); r[n][0] = 0;                              n++;
 }
 
 // Renders page `pg` (0-based, across all sections). Returns total page count.
 static int renderViewPage(const char* file, int pg) {
-  static char l[ui::TABLE_ROWS][34], r[ui::TABLE_ROWS][22];
+  static char l[ui::TABLE_ROWS][34], r[ui::TABLE_ROWS][28];
   static const char* lp[ui::TABLE_ROWS];
   static const char* rp[ui::TABLE_ROWS];
   for (int i = 0; i < ui::TABLE_ROWS; ++i) { l[i][0] = r[i][0] = 0; lp[i] = l[i]; rp[i] = r[i]; }
@@ -484,9 +484,9 @@ static int renderViewPage(const char* file, int pg) {
         if (parsed.ev[i].afcs != afcs) continue;
         if (k++ < start) continue;
         const hg6::Event& e = parsed.ev[i];
-        snprintf(l[n], 34, "%s", e.label);  snprintf(r[n], 22, "%s", e.first);  n++;
+        snprintf(l[n], 34, "%s", e.label);  snprintf(r[n], 28, "%s", e.first);  n++;
         snprintf(l[n], 34, "   last / count");
-        snprintf(r[n], 22, "%s x%d", e.last[0] ? e.last : "-", e.count);  n++;
+        snprintf(r[n], 28, "%s x%d", e.last[0] ? e.last : "-", e.count);  n++;
       }
       if (n == 0) { snprintf(l[0], 34, afcs ? "NO AFCSFAULTS ARE AVAILABLE" : "NO FAULTS ARE AVAILABLE"); n = 1; }
       break;
@@ -494,7 +494,7 @@ static int renderViewPage(const char* file, int pg) {
     case 2:
       for (int i = start; i < parsed.ncum && n < ui::TABLE_ROWS; ++i, ++n) {
         snprintf(l[n], 34, "%.29s", parsed.cum[i].item);
-        snprintf(r[n], 22, "%s", parsed.cum[i].value);
+        snprintf(r[n], 28, "%s", parsed.cum[i].value);
       }
       if (n == 0) { snprintf(l[0], 34, "NO CUMULATIVES LOG DATA"); n = 1; }
       break;
@@ -505,11 +505,13 @@ static int renderViewPage(const char* file, int pg) {
       if (parsed.npa) {
         const hg6::PaRow& p = parsed.pa[start];
         snprintf(l[0], 34, "%s", p.col[0]);
-        snprintf(r[0], 22, "%d / %d", start + 1, parsed.npa);
-        snprintf(l[1], 34, "OAT %sC  Pa %s ft  IAS %s kt", p.col[1], p.col[2], p.col[3]);
-        snprintf(l[2], 34, "       N2   TRQ  TOT   N1 IDLE MAN");
-        snprintf(l[3], 34, "Eng1 %4s  %4s %4s %5s %4s %3s", p.col[4], p.col[5], p.col[6], p.col[7], p.col[8], p.col[9]);
-        snprintf(l[4], 34, "Eng2 %4s  %4s %4s %5s %4s %3s", p.col[10], p.col[11], p.col[12], p.col[13], p.col[14], p.col[15]);
+        snprintf(r[0], 28, "%d / %d", start + 1, parsed.npa);
+        snprintf(l[1], 34, "OAT %.4s  Pa %.6s  IAS %.4s", p.col[1], p.col[2], p.col[3]);
+        snprintf(l[2], 34, "    N2  TRQ TOT    N1 IDL MAN");
+        snprintf(l[3], 34, "E1 %3.3s %3.3s %3.3s %5.5s %3.3s %3.3s",
+                 p.col[4], p.col[5], p.col[6], p.col[7], p.col[8], p.col[9]);
+        snprintf(l[4], 34, "E2 %3.3s %3.3s %3.3s %5.5s %3.3s %3.3s",
+                 p.col[10], p.col[11], p.col[12], p.col[13], p.col[14], p.col[15]);
         n = 5;
       } else {
         snprintf(l[0], 34, "NO POWER ASSURANCE LOG DATA"); n = 1;
@@ -558,8 +560,11 @@ static void viewFile(const char* path) {
 }
 
 static void dataView() {
-  static char names[16][storage::NAME_LEN];
-  const int n = storage::listDownloads(names, 16);
+  // Newest first; the list pages through all of them. 64 downloads is ~38 MB of
+  // files, more than the internal-flash backend can hold.
+  static const int MAX_FILES = 64;
+  static char names[MAX_FILES][storage::NAME_LEN];
+  const int n = storage::listDownloads(names, MAX_FILES);
   if (n == 0) {
     ui::screen("DATA VIEW", "No downloads stored", "", "", "tap = back");
     waitTouchOrSleep();

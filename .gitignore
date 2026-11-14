@@ -28,3 +28,4 @@ sandbox/logs/
 
 # built pty shim
 sandbox/ptymodem/*.so
+firmware/arduino/test/hg6_test_asan

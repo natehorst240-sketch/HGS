@@ -192,7 +192,11 @@ static void parseCumulative(const uint8_t* d, size_t len, Parsed& out) {
   char item[40];
   for (int i = 0; i < 4; ++i) {
     const Block& b = blocks[i];
-    const size_t nxt = (i + 1 < 4) ? blocks[i + 1].ao : blen - 4;
+    // Every scan below is bounded by `nxt`, so clamp it to the bytes we
+    // actually hold: a file truncated inside a component block must not read
+    // past the section (nor show values from unread memory).
+    size_t nxt = (i + 1 < 4) ? blocks[i + 1].ao : blen - 4;
+    if (nxt > blen) nxt = blen;
     if (b.ao + b.snlen + 6 > blen) break;
     memcpy(v, blk + b.ao, b.snlen); v[b.snlen] = 0;
     { size_t e = b.snlen; while (e > 0 && v[e - 1] == ' ') v[--e] = 0;
@@ -209,7 +213,7 @@ static void parseCumulative(const uint8_t* d, size_t len, Parsed& out) {
       size_t r = q + 10;
       while (r < nxt && blk[r] == 0) r++;
       r -= 1;
-      if (r + 4 + 5 + 30 > blen) break;
+      if (r + 4 + 5 + 30 > nxt) break;   // whole engine ladder must be present
       hhmm(blk + r, v, sizeof(v));
       snprintf(item, sizeof(item), "%s Running Time", b.name); addRow(out, item, v);
       const size_t c = r + 4 + 5;
@@ -241,8 +245,10 @@ static void parseCumulative(const uint8_t* d, size_t len, Parsed& out) {
     } else {
       // Transmissions: chip detector D.A. is the last nonzero BCD pair.
       long chip = 0;
-      for (size_t k = nxt - 2; k > q + 6; --k) {
-        if (blk[k] || blk[k + 1]) { chip = bcdInt(blk + k, 2); break; }
+      if (nxt >= 2) {
+        for (size_t k = nxt - 2; k > q + 6; --k) {        // reads k and k+1 < nxt
+          if (blk[k] || blk[k + 1]) { chip = bcdInt(blk + k, 2); break; }
+        }
       }
       snprintf(v, sizeof(v), "%ld", chip);
       snprintf(item, sizeof(item), "%s Cumulative Chip D.A.", b.name); addRow(out, item, v);
@@ -259,22 +265,22 @@ static void parsePowerAssurance(const uint8_t* d, size_t len, Parsed& out) {
   while (p + 34 <= len && bcdTsOk(d + p, 6) && out.npa < MAX_PA) {
     const uint8_t* s = d + p;
     PaRow& r = out.pa[out.npa++];
-    ts(s, r.col[0], 20);
-    intStr(s + 6, 3, r.col[1], 20);           // OAT
-    intStr(s + 9, 3, r.col[2], 20);           // Pa
-    intStr(s + 28, 2, r.col[3], 20);          // IAS
-    intStr(s + 12, 2, r.col[4], 20);          // N2 1
-    intStr(s + 16, 2, r.col[5], 20);          // TRQ 1
-    intStr(s + 20, 2, r.col[6], 20);          // TOT 1 Act
-    tenths(s + 24, 2, r.col[7], 20);          // N1 1 Act
-    snprintf(r.col[8], 20, "%s", s[30] ? "ON" : "OFF");   // IDLE 1
-    snprintf(r.col[9], 20, "%s", s[32] ? "ON" : "OFF");   // MAN 1
-    intStr(s + 14, 2, r.col[10], 20);         // N2 2
-    intStr(s + 18, 2, r.col[11], 20);         // TRQ 2
-    intStr(s + 22, 2, r.col[12], 20);         // TOT 2 Act
-    tenths(s + 26, 2, r.col[13], 20);         // N1 2 Act
-    snprintf(r.col[14], 20, "%s", s[31] ? "ON" : "OFF");  // IDLE 2
-    snprintf(r.col[15], 20, "%s", s[33] ? "ON" : "OFF");  // MAN 2
+    ts(s, r.col[0], 28);
+    intStr(s + 6, 3, r.col[1], 28);           // OAT
+    intStr(s + 9, 3, r.col[2], 28);           // Pa
+    intStr(s + 28, 2, r.col[3], 28);          // IAS
+    intStr(s + 12, 2, r.col[4], 28);          // N2 1
+    intStr(s + 16, 2, r.col[5], 28);          // TRQ 1
+    intStr(s + 20, 2, r.col[6], 28);          // TOT 1 Act
+    tenths(s + 24, 2, r.col[7], 28);          // N1 1 Act
+    snprintf(r.col[8], 28, "%s", s[30] ? "ON" : "OFF");   // IDLE 1
+    snprintf(r.col[9], 28, "%s", s[32] ? "ON" : "OFF");   // MAN 1
+    intStr(s + 14, 2, r.col[10], 28);         // N2 2
+    intStr(s + 18, 2, r.col[11], 28);         // TRQ 2
+    intStr(s + 22, 2, r.col[12], 28);         // TOT 2 Act
+    tenths(s + 26, 2, r.col[13], 28);         // N1 2 Act
+    snprintf(r.col[14], 28, "%s", s[31] ? "ON" : "OFF");  // IDLE 2
+    snprintf(r.col[15], 28, "%s", s[33] ? "ON" : "OFF");  // MAN 2
     p += 34;
   }
 }

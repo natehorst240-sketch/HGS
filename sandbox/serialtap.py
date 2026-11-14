@@ -23,8 +23,10 @@ from __future__ import annotations
 import argparse
 import os
 import select
+import signal
 import sys
 import termios
+import threading
 import time
 import tty
 
@@ -77,19 +79,45 @@ def slave_baud(slave_fd: int) -> int | None:
         return None
 
 
+def _is_fifo(path: str) -> bool:
+    import stat
+    try:
+        return stat.S_ISFIFO(os.stat(path).st_mode)
+    except OSError:
+        return False
+
+
 class Logger:
     def __init__(self, path: str | None, idle_s: float, quiet: bool, pcap: str | None = None):
         self.fh = open(path, "a") if path else None
-        self.pcap = None
-        if pcap:
-            # a FIFO blocks here until Wireshark opens its end - that's intended
-            self.pcap = pcapng.Writer(open(pcap, "wb"))
-        self.wall0 = time.time()
         self.idle = idle_s
         self.quiet = quiet
         self.t0 = time.monotonic()
+        self.wall0 = time.time()
         self.buf = {">>": bytearray(), "<<": bytearray()}
         self.last = {">>": 0.0, "<<": 0.0}
+        self.pcap = None
+        self.pcap_pending: list[tuple[int, bytes, int]] = []
+        if pcap:
+            if _is_fifo(pcap):
+                # opening a FIFO for writing blocks until a reader (Wireshark)
+                # connects; do that in a thread so the bridge starts right away
+                # and buffer frames until then
+                threading.Thread(target=self._open_pcap, args=(pcap,), daemon=True).start()
+            else:
+                self.pcap = pcapng.Writer(open(pcap, "wb"))
+
+    def _open_pcap(self, path: str) -> None:
+        try:
+            w = pcapng.Writer(open(path, "wb"))
+        except OSError as e:
+            print(f"-- pcap {path}: {e}; continuing without pcapng", flush=True)
+            return
+        for ifid, data, ts in self.pcap_pending:
+            w.frame(ifid, data, ts)
+        self.pcap_pending = []
+        self.pcap = w
+        print("-- pcap reader connected", flush=True)
 
     def add(self, tag: str, data: bytes) -> None:
         now = time.monotonic()
@@ -111,12 +139,15 @@ class Logger:
         self.buf[tag].clear()
         ms = int((self.last[tag] - self.t0) * 1000)
         line = "[%8d ms] %s %s" % (ms, tag, " ".join("%02x" % b for b in data))
+        ifid = pcapng.IF_PROGRAM if tag == ">>" else pcapng.IF_DEVICE
+        ts = int((self.wall0 + self.last[tag] - self.t0) * 1_000_000)
         if self.pcap:
-            ifid = pcapng.IF_PROGRAM if tag == ">>" else pcapng.IF_DEVICE
             try:
-                self.pcap.frame(ifid, data, int((self.wall0 + self.last[tag] - self.t0) * 1_000_000))
+                self.pcap.frame(ifid, data, ts)
             except BrokenPipeError:
                 self.pcap = None  # Wireshark closed the fifo; keep bridging
+        elif self.pcap_pending is not None and len(self.pcap_pending) < 10000:
+            self.pcap_pending.append((ifid, data, ts))
         if self.fh:
             self.fh.write(line + "\n")
             self.fh.flush()
@@ -136,14 +167,6 @@ class Logger:
                 self.pcap.close()
             except OSError:
                 pass
-
-
-def _is_fifo(path: str) -> bool:
-    import stat
-    try:
-        return stat.S_ISFIFO(os.stat(path).st_mode)
-    except OSError:
-        return False
 
 
 def main() -> int:
@@ -178,19 +201,26 @@ def main() -> int:
         peer_slave = None
         print(f"program side {prog_path}  <->  {args.real} @ {args.baud} 8N1", flush=True)
 
-    link = None
+    links: list[str] = []
     if not args.no_link:
+        # Two links: the stable one that HKLM\Software\Wine\Ports\COMn names
+        # (setup.sh wrote it; Wine recreates dosdevices/comN from it at every
+        # start), and dosdevices/comN itself for a wineserver that is already up.
+        stable = os.path.join(args.prefix, f"com{args.com}.serial")
         dosdev = os.path.join(args.prefix, "dosdevices")
         os.makedirs(dosdev, exist_ok=True)
-        link = os.path.join(dosdev, f"com{args.com}")
-        if os.path.islink(link) or os.path.exists(link):
-            os.remove(link)
-        os.symlink(prog_path, link)
-        print(f"COM{args.com} in {args.prefix} -> {prog_path}", flush=True)
+        for link, target in ((stable, prog_path), (os.path.join(dosdev, f"com{args.com}"), stable)):
+            if os.path.islink(link) or os.path.exists(link):
+                os.remove(link)
+            os.symlink(target, link)
+            links.append(link)
+        print(f"COM{args.com} in {args.prefix} -> {stable} -> {prog_path}", flush=True)
 
     if args.pcap and not args.quiet:
         print(f"pcapng -> {args.pcap}" + ("  (waiting for a reader)" if _is_fifo(args.pcap) else ""), flush=True)
     log = Logger(args.log, args.idle / 1000.0, args.quiet, args.pcap)
+    # run.sh stops us with SIGTERM: route it through the same cleanup as Ctrl+C
+    signal.signal(signal.SIGTERM, lambda *_: (_ for _ in ()).throw(KeyboardInterrupt))
     cur_baud = args.baud
     last_baud_check = 0.0
     try:
@@ -222,8 +252,9 @@ def main() -> int:
         pass
     finally:
         log.close()
-        if link and os.path.islink(link):
-            os.remove(link)
+        for link in links:  # never leave COMn pointing at a recycled pty
+            if os.path.islink(link):
+                os.remove(link)
         for fd in (prog_master, prog_slave, far_fd, peer_slave):
             if fd is not None:
                 try:

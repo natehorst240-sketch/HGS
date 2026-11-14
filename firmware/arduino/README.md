@@ -24,16 +24,43 @@ Windows mounts a 10 MB FAT volume, writes to it, and `/syslog.txt` reports
 | `hgs_stick/config.h` | **pin map — single source of truth** |
 | `hgs_stick/dau_protocol.{h,cpp}` | the wire protocol, Arduino-free so it can be tested on a PC |
 | `hgs_stick/cst816.{h,cpp}` | touch driver (tap = start, hold = abort) |
-| `hgs_stick/ui.{h,cpp}` | HGS-styled screen, 320×170 landscape |
+| `hgs_stick/ui.{h,cpp}` | HGS-styled screen, 320×170 landscape: status panel, menu, Data View table |
+| `hgs_stick/hg6.{h,cpp}` | `.HG6` decoder (port of `hgs/hg6.py`), Arduino-free, host-tested |
 | `hgs_stick/storage.{h,cpp}` | SDMMC or internal-flash mount, USB MSC, HGS filename from BCD |
 | `hgs_stick/stick_log.{h,cpp}` | persistent `/syslog.txt`, boot counter, reset-reason forensics |
-| `test/replay_test.cpp` | **the port gate — run this first** |
+| `test/replay_test.cpp` | **the protocol port gate — run this first** |
+| `test/hg6_test.cpp` + `hg6_expected.py` | decoder gate: C++ output must equal the Python parser's on every file in `sample-data/` |
 
 Fixed buffers and `char[]` are used throughout instead of `std::string`/`std::vector`.
 That is deliberate: a download runs for 10–14 minutes and must not depend on heap
 behaviour partway through. The protocol reads into one static 4 KB buffer.
 
-## Run the port gate before you flash anything
+## Screen flow (mirrors the Linux app, `hgs/ui.py`)
+
+Main menu = the app's IDS menu plus Data View: **Download Logs**, **Download
+Cumulative**, **IDS Status Download**, **Data View**. Tap a row. Downloads run
+exactly as before (tap-to-start is now the menu tap; hold ≈1.5 s = abort) and
+are saved as `SSSSS_YYMMDD_A1.HG6`; cumulative-only and status downloads get
+`_C1` / `_S1` instead of `_A1` (our convention; only DOWNLOAD LOGS has been
+captured from a real DAU, the other two commands are known from the exe's
+strings and have not been exercised against an aircraft).
+
+Data View lists the stored `.HG6` files (newest first), tap one, then page
+through the same sections the app shows as tabs: Exceedance (catalog count
+only, event layout undecoded), Fault Log, Cumulative Log, Time History
+(summary; the 1 Hz table stays on the PC), Power Assurance Log, AFCS Fault Log.
+Tap the right half for the next page, left half for the previous, hold to go back.
+
+The touch-to-screen mapping for landscape is set in `config.h`
+(`TOUCH_FLIP_X/Y`) and is **unverified on hardware**: every tap is echoed on the
+USB serial console as `tap raw=(x,y) screen=(x,y)`, so flip the constants if rows
+or halves come out mirrored.
+
+## Run the port gates before you flash anything
+
+`make` in `test/` runs both gates: the protocol replay below and the decoder
+gate, which diffs the C++ `.HG6` decoder's output against the Python parser for
+every file in `sample-data/` (two real aircraft at the time of writing).
 
 The Python implementation was validated byte-for-byte against a real A109
 download. This test holds the C++ port to the same bar by replaying
@@ -81,9 +108,9 @@ Upload adds `--port COMn -u`.
 
 | Component | Version |
 |---|---|
-| `esp32:esp32` core | 3.3.11 |
-| GFX Library for Arduino | 1.6.7 |
-| arduino-cli | 1.5.1 |
+| `esp32:esp32` core | 3.3.11, 3.3.12 |
+| GFX Library for Arduino | 1.6.7, 1.6.9 |
+| arduino-cli | 1.5.1, 1.6.0 |
 | host compiler (port gate) | GCC 14.1.0 (w64devkit 1.23.0) |
 
 Core 3.x matters: it selects the `esp_task_wdt_reconfigure()` branch of the

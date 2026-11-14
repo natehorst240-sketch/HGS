@@ -111,8 +111,8 @@ Result Downloader::download(const char* command) {
     if (attempt == 0) {
       status_("REQUEST FRAME MSG SENT");
     } else {
-      char msg[32];
-      snprintf(msg, sizeof(msg), "RETRYING REQUEST (%d)", attempt + 1);
+      char msg[40];
+      snprintf(msg, sizeof(msg), "RETRYING DOWNLOADER TO START (%d)", attempt + 1);
       status_(msg);
     }
     len = readRecord(REQUEST_TIMEOUT_MS, tail, writeFailed);

@@ -9,7 +9,8 @@ status strings:
     FRAME CHECKED OK
     RETRANSMIT
     WAIT FOR FRAME COMPLETION
-    DOWNLOAD COMPLETED WITH SUCCESS / WITH ABORT / FAILED
+    RETRYING DOWNLOADER TO START
+    COMPLETED WITH SUCCESS / COMPLETED WITH ABORT
 
 The exact on-wire bytes (frame delimiters, length fields, checksum algorithm,
 ACK/NAK codes) are NOT in any accompanying file — they must be recovered from a
@@ -35,9 +36,11 @@ class State(enum.Enum):
     RECEIVING = "FRAME BYTES RECEIVED"
     FRAME_OK = "FRAME CHECKED OK"
     RETRANSMIT = "RETRANSMIT"
-    DONE_OK = "DOWNLOAD COMPLETED WITH SUCCESS"
-    DONE_ABORT = "DOWNLOAD COMPLETED WITH ABORT"
-    FAILED = "DOWNLOAD FAILED"
+    RETRYING = "RETRYING DOWNLOADER TO START"
+    # Exact strings from Hgs_cpp.exe (the stick firmware shows the same ones).
+    DONE_OK = "COMPLETED WITH SUCCESS"
+    DONE_ABORT = "COMPLETED WITH ABORT"
+    FAILED = "DOWNLOAD FAILED"   # not an exe string; HGS has no failure text of its own
 
 
 @dataclass

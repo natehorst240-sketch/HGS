@@ -9,7 +9,10 @@ __pycache__/
 
 # build output
 .pio/
+firmware/arduino/test/replay_test
 firmware/arduino/test/replay_test.exe
+firmware/arduino/test/hg6_test
+firmware/arduino/test/hg6_test.exe
 *.o
 
 # KiCad autosaves, backups, locks
@@ -22,3 +25,7 @@ fp-info-cache
 
 # sandbox serial captures
 sandbox/logs/
+
+# built pty shim
+sandbox/ptymodem/*.so
+firmware/arduino/test/hg6_test_asan

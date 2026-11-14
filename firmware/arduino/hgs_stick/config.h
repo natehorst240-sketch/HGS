@@ -54,6 +54,15 @@ static const int PIN_SD_CLK = 41;
 static const int PIN_BAT_ADC = 4;
 static const float BAT_DIVIDER = 3.0f;
 
+// --- Touch -> screen mapping (landscape, rotation 1) -----------------------
+// The CST816 reports portrait coordinates: 0..169 across, 0..319 down. The
+// screen is drawn 320 wide x 170 high, so the axes swap. UNVERIFIED on the
+// assembled unit: taps are echoed on the USB serial console as
+// "tap raw=(x,y) screen=(x,y)". If tapping the top menu row selects the bottom
+// one, flip TOUCH_FLIP_Y; if left/right paging is backwards, flip TOUCH_FLIP_X.
+static const bool TOUCH_FLIP_X = false;
+static const bool TOUCH_FLIP_Y = true;
+
 // --- behaviour --------------------------------------------------------------
 static const uint32_t DAU_BAUD = 9600;            // 9600,n,8,1 per the original app
 static const int LOW_BATT_PCT = 20;

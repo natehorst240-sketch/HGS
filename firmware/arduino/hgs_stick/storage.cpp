@@ -344,7 +344,7 @@ static bool hgsBasename(const char* partPath, char* out, size_t outLen) {
   return found;
 }
 
-bool finalise(const char* partPath, char* out, size_t outLen) {
+bool finalise(const char* partPath, char typeLetter, char* out, size_t outLen) {
   char base[32];
   if (!hgsBasename(partPath, base, sizeof(base))) {
     // strip ".PART"
@@ -354,10 +354,78 @@ bool finalise(const char* partPath, char* out, size_t outLen) {
     return vol->rename(partPath, out);
   }
   for (int n = 1; n < 100; ++n) {
-    snprintf(out, outLen, "/%s_A%d.HG6", base, n);
+    snprintf(out, outLen, "/%s_%c%d.HG6", base, typeLetter, n);
     if (!vol->exists(out)) return vol->rename(partPath, out);
   }
   return false;
+}
+
+// Ordering for the Data View file list: newest download first. HGS names are
+// SSSSS_YYMMDD_An.HG6, so the date is the second field; comparing whole names
+// would order by aircraft serial instead and could push a fresh download off
+// the end of a capped list. Names without that shape (DOWNLOAD_NN.HG6) sort
+// after dated ones, by name.
+static bool dateKey(const char* name, const char** key) {
+  const char* p = strchr(name, '_');
+  if (!p) return false;
+  p++;
+  for (int i = 0; i < 6; ++i) if (!isdigit((unsigned char)p[i])) return false;
+  if (p[6] != '_') return false;
+  *key = p;
+  return true;
+}
+
+static bool newerFirst(const char* a, const char* b) {   // true if a before b
+  const char *ka, *kb;
+  const bool da = dateKey(a, &ka), db = dateKey(b, &kb);
+  if (da != db) return da;                               // dated names first
+  if (da) {
+    const int c = strncmp(ka, kb, 6);
+    if (c != 0) return c > 0;                            // later date first
+  }
+  return strcmp(a, b) > 0;                               // then by name, descending
+}
+
+int listDownloads(char (*names)[NAME_LEN], int maxNames) {
+  if (!mounted() || maxNames <= 0) return 0;
+  File root = vol->open("/");
+  if (!root) return 0;
+  int n = 0;
+  for (File f = root.openNextFile(); f; f = root.openNextFile()) {
+    const char* nm = f.name();
+    if (nm[0] == '/') nm++;                       // core versions differ here
+    if (endsWithNoCase(nm, ".HG6")) {
+      char cand[NAME_LEN];
+      snprintf(cand, sizeof(cand), "/%s", nm);
+      // insertion sort, newest first (see newerFirst); a full list drops the oldest
+      int pos = n < maxNames ? n : maxNames - 1;
+      if (n >= maxNames && !newerFirst(cand, names[pos])) { f.close(); continue; }
+      while (pos > 0 && newerFirst(cand, names[pos - 1])) {
+        memcpy(names[pos], names[pos - 1], NAME_LEN);
+        pos--;
+      }
+      memcpy(names[pos], cand, NAME_LEN);
+      if (n < maxNames) n++;
+    }
+    f.close();
+  }
+  root.close();
+  return n;
+}
+
+bool readAll(const char* path, uint8_t* buf, size_t maxLen, size_t& got) {
+  got = 0;
+  if (!mounted()) return false;
+  File f = vol->open(path, FILE_READ);
+  if (!f) return false;
+  while (got < maxLen) {
+    const size_t n = f.read(buf + got, maxLen - got);
+    if (n == 0) break;
+    got += n;
+  }
+  const bool complete = (f.available() == 0);
+  f.close();
+  return complete;
 }
 
 void removeFile(const char* path) { if (mounted()) vol->remove(path); }

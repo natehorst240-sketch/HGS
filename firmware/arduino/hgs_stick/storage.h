@@ -43,7 +43,20 @@ void nextPartName(char* out, size_t outLen);
 // used: SSSSS_YYMMDD_An.HG6, read from the Cumulative Log block. Falls back to
 // stripping ".PART" when the serial/date cannot be parsed. Returns the final
 // name in `out`.
-bool finalise(const char* partPath, char* out, size_t outLen);
+//
+// `typeLetter` is the letter before the sequence number: 'A' for DOWNLOAD
+// LOGS (what the Windows app writes). Cumulative-only and status downloads use
+// 'C' and 'S' so they are distinguishable on the drive; those letters are our
+// convention, the Windows app's naming for them has not been observed.
+bool finalise(const char* partPath, char typeLetter, char* out, size_t outLen);
+
+// Stored downloads ("/NAME.HG6"), newest name first (lexical, which orders the
+// SSSSS_YYMMDD names by date). Returns how many were written to `names`.
+static const size_t NAME_LEN = 32;
+int listDownloads(char (*names)[NAME_LEN], int maxNames);
+
+// Read a whole file into `buf` (at most `maxLen` bytes); `got` = bytes read.
+bool readAll(const char* path, uint8_t* buf, size_t maxLen, size_t& got);
 
 void removeFile(const char* path);
 uint32_t fileSize(const char* path);

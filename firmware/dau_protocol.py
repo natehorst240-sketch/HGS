@@ -103,7 +103,7 @@ class DauDownloader:
                 break
             self._send(command)
             self.on_status("REQUEST FRAME MSG SENT" if attempt == 0
-                           else "RETRYING REQUEST (%d)" % (attempt + 1))
+                           else "RETRYING DOWNLOADER TO START (%d)" % (attempt + 1))
             rec = self._read_record(REQUEST_TIMEOUT_MS)
             if rec:
                 break

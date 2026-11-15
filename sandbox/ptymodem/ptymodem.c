@@ -8,9 +8,11 @@
  * ENOTTY on a tty it reports CTS, DSR and carrier asserted and accepts
  * control-line changes. Everything else passes straight through.
  *
- *   gcc -shared -fPIC -O2 -o ptymodem64.so ptymodem.c -ldl
- *   gcc -m32 -shared -fPIC -O2 -o ptymodem32.so ptymodem.c -ldl
- *   LD_PRELOAD=/path/ptymodem32.so wine program.exe
+ *   sandbox/setup.sh builds it into lib/<multiarch>/ptymodem.so for both
+ *   architectures; run.sh preloads "ptymodem/$LIB/ptymodem.so" and the dynamic
+ *   loader resolves $LIB per process. By hand:
+ *   gcc [-m32] -shared -fPIC -O2 -o ptymodem.so ptymodem.c -ldl
+ *   LD_PRELOAD=/path/ptymodem.so wine program.exe
  */
 #define _GNU_SOURCE
 #include <dlfcn.h>

@@ -82,17 +82,15 @@ elif [ "$SIM" = 1 ]; then
 fi
 
 # Wine on a pseudo-terminal needs the modem-line shim or it never delivers
-# received bytes (see ptymodem/ptymodem.c). Preload whichever builds exist.
+# received bytes (see ptymodem/ptymodem.c). "$LIB" is expanded by the dynamic
+# loader itself (lib/x86_64-linux-gnu or lib/i386-linux-gnu), so each Wine
+# process loads the build for its own architecture and nothing else.
 if [ -n "$TAP" ] || [ "$SIM" = 1 ]; then
-  SHIMS=""
-  for so in "$HERE/ptymodem/ptymodem32.so" "$HERE/ptymodem/ptymodem64.so"; do
-    [ -f "$so" ] && SHIMS="$SHIMS${SHIMS:+ }$so"
-  done
-  if [ -n "$SHIMS" ]; then
-    export LD_PRELOAD="$SHIMS${LD_PRELOAD:+ $LD_PRELOAD}"
-    echo "pty modem shim: $SHIMS"
+  if ls "$HERE"/ptymodem/lib/*/ptymodem.so >/dev/null 2>&1; then
+    export LD_PRELOAD="$HERE/ptymodem/\$LIB/ptymodem.so${LD_PRELOAD:+ $LD_PRELOAD}"
+    echo "pty modem shim: $(ls "$HERE"/ptymodem/lib/*/ptymodem.so | tr '\n' ' ')"
   else
-    echo "WARNING: sandbox/ptymodem/*.so not built; run sandbox/setup.sh (needs gcc, gcc-multilib). Serial RX will not work." >&2
+    echo "WARNING: sandbox/ptymodem/lib/*/ptymodem.so not built; run sandbox/setup.sh (needs gcc, gcc-multilib). Serial RX will not work." >&2
   fi
 fi
 

@@ -50,3 +50,13 @@ int ioctl(int fd, unsigned long request, ...)
         return ret;
     }
 }
+
+/* 32-bit builds with 64-bit time_t (Wine enables _TIME_BITS=64, and Debian /
+ * Ubuntu i386 glibc defaults to it) rename every ioctl() call site to
+ * __ioctl_time64. Without this alias the 32-bit shim loads but intercepts
+ * nothing - which is exactly what /proc/PID/maps showing ptymodem32.so and
+ * TIOCMGET still failing looked like. */
+#if !defined(__LP64__) && !defined(_LP64)
+int __ioctl_time64(int fd, unsigned long request, ...)
+    __attribute__((alias("ioctl")));
+#endif

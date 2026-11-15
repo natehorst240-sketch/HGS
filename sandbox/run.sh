@@ -50,6 +50,12 @@ TRACEFILE="$HERE/logs/$STAMP.trace"
 PIDS=()
 cleanup() { for p in "${PIDS[@]:-}"; do [ -n "$p" ] && kill "$p" 2>/dev/null || true; done; rm -f "$HERE"/logs/.live_*.fifo; }
 trap cleanup EXIT
+# Ctrl+C: ask Wine to shut the prefix down instead of letting the terminal's
+# SIGINT land on wineserver, which answers it by dumping every object it owns
+# to the terminal (harmless, thousands of lines, and it ends up pasted into
+# the next command). wineboot -k is the same as closing the program.
+on_int() { echo; echo "stopping wine..."; wineboot -k 2>/dev/null; }
+trap on_int INT
 
 if [ "$WS" = 1 ]; then
   command -v wireshark >/dev/null || { echo "wireshark not installed" >&2; exit 1; }
@@ -99,8 +105,10 @@ echo "starting: wine $EXE $*   (sandbox $NAME)"
 cd "$(dirname "$EXE")"
 if [ "$TRACE" = 1 ]; then
   echo "tracing to $TRACEFILE (this slows the program down a little)"
-  WINEDEBUG="+file,+reg,+loaddll,+comm" wine "./$(basename "$EXE")" "$@" 2>"$TRACEFILE" || echo "wine exited with status $?"
+  # setsid: Wine runs in its own process group, so the terminal's Ctrl+C
+  # reaches only this script (see on_int) and never wineserver.
+  WINEDEBUG="+file,+reg,+loaddll,+comm" setsid -w wine "./$(basename "$EXE")" "$@" 2>"$TRACEFILE" || echo "wine exited with status $?"
   python3 "$HERE/tracesum.py" "$TRACEFILE"
 else
-  wine "./$(basename "$EXE")" "$@" || echo "wine exited with status $?"
+  setsid -w wine "./$(basename "$EXE")" "$@" || echo "wine exited with status $?"
 fi

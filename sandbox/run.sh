@@ -50,6 +50,12 @@ TRACEFILE="$HERE/logs/$STAMP.trace"
 PIDS=()
 cleanup() { for p in "${PIDS[@]:-}"; do [ -n "$p" ] && kill "$p" 2>/dev/null || true; done; rm -f "$HERE"/logs/.live_*.fifo; }
 trap cleanup EXIT
+# Ctrl+C: ask Wine to shut the prefix down instead of letting the terminal's
+# SIGINT land on wineserver, which answers it by dumping every object it owns
+# to the terminal (harmless, thousands of lines, and it ends up pasted into
+# the next command). wineboot -k is the same as closing the program.
+on_int() { echo; echo "stopping wine..."; wineboot -k 2>/dev/null; }
+trap on_int INT
 
 if [ "$WS" = 1 ]; then
   command -v wireshark >/dev/null || { echo "wireshark not installed" >&2; exit 1; }
@@ -82,17 +88,15 @@ elif [ "$SIM" = 1 ]; then
 fi
 
 # Wine on a pseudo-terminal needs the modem-line shim or it never delivers
-# received bytes (see ptymodem/ptymodem.c). Preload whichever builds exist.
+# received bytes (see ptymodem/ptymodem.c). "$LIB" is expanded by the dynamic
+# loader itself (lib/x86_64-linux-gnu or lib/i386-linux-gnu), so each Wine
+# process loads the build for its own architecture and nothing else.
 if [ -n "$TAP" ] || [ "$SIM" = 1 ]; then
-  SHIMS=""
-  for so in "$HERE/ptymodem/ptymodem32.so" "$HERE/ptymodem/ptymodem64.so"; do
-    [ -f "$so" ] && SHIMS="$SHIMS${SHIMS:+ }$so"
-  done
-  if [ -n "$SHIMS" ]; then
-    export LD_PRELOAD="$SHIMS${LD_PRELOAD:+ $LD_PRELOAD}"
-    echo "pty modem shim: $SHIMS"
+  if ls "$HERE"/ptymodem/lib/*/ptymodem.so >/dev/null 2>&1; then
+    export LD_PRELOAD="$HERE/ptymodem/\$LIB/ptymodem.so${LD_PRELOAD:+ $LD_PRELOAD}"
+    echo "pty modem shim: $(ls "$HERE"/ptymodem/lib/*/ptymodem.so | tr '\n' ' ')"
   else
-    echo "WARNING: sandbox/ptymodem/*.so not built; run sandbox/setup.sh (needs gcc, gcc-multilib). Serial RX will not work." >&2
+    echo "WARNING: sandbox/ptymodem/lib/*/ptymodem.so not built; run sandbox/setup.sh (needs gcc, gcc-multilib). Serial RX will not work." >&2
   fi
 fi
 
@@ -101,8 +105,10 @@ echo "starting: wine $EXE $*   (sandbox $NAME)"
 cd "$(dirname "$EXE")"
 if [ "$TRACE" = 1 ]; then
   echo "tracing to $TRACEFILE (this slows the program down a little)"
-  WINEDEBUG="+file,+reg,+loaddll,+comm" wine "./$(basename "$EXE")" "$@" 2>"$TRACEFILE" || echo "wine exited with status $?"
+  # setsid: Wine runs in its own process group, so the terminal's Ctrl+C
+  # reaches only this script (see on_int) and never wineserver.
+  WINEDEBUG="+file,+reg,+loaddll,+comm" setsid -w wine "./$(basename "$EXE")" "$@" 2>"$TRACEFILE" || echo "wine exited with status $?"
   python3 "$HERE/tracesum.py" "$TRACEFILE"
 else
-  wine "./$(basename "$EXE")" "$@" || echo "wine exited with status $?"
+  setsid -w wine "./$(basename "$EXE")" "$@" || echo "wine exited with status $?"
 fi

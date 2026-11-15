@@ -124,14 +124,19 @@ fi
 # MSCOMM32-style programs never receive anything without it. 32-bit Wine
 # processes need the 32-bit build (gcc-multilib).
 HERE=$(cd "$(dirname "$0")" && pwd)
+# Each build goes under lib/<multiarch>/ so run.sh can preload one path,
+# "$LIB/ptymodem.so", and the dynamic loader of every Wine process (32- or
+# 64-bit) picks its own copy silently instead of complaining about the other.
 if command -v gcc >/dev/null; then
-  ( cd "$HERE/ptymodem" && gcc -shared -fPIC -O2 -o ptymodem64.so ptymodem.c -ldl ) \
-    && echo "ptymodem64.so built" || echo "warning: ptymodem64.so failed to build"
-  if ( cd "$HERE/ptymodem" && gcc -m32 -shared -fPIC -O2 -o ptymodem32.so ptymodem.c -ldl 2>/dev/null ); then
-    echo "ptymodem32.so built"
-  else
-    echo "NOTE: 32-bit shim not built. 32-bit Wine needs it for COM ports on the tap:  sudo apt install gcc-multilib  then re-run setup"
-  fi
+  build_shim() {   # $1 = extra gcc flags
+    local arch; arch=$(gcc $1 -print-multiarch 2>/dev/null) || return 1
+    [ -n "$arch" ] || return 1
+    mkdir -p "$HERE/ptymodem/lib/$arch" &&
+      gcc $1 -shared -fPIC -O2 -o "$HERE/ptymodem/lib/$arch/ptymodem.so" "$HERE/ptymodem/ptymodem.c" -ldl 2>/dev/null &&
+      echo "ptymodem.so built for $arch"
+  }
+  build_shim "" || echo "warning: 64-bit ptymodem.so failed to build"
+  build_shim "-m32" || echo "NOTE: 32-bit shim not built. 32-bit Wine needs it for COM ports on the tap:  sudo apt install gcc-multilib  then re-run setup"
 else
   echo "NOTE: gcc not found; serial via the tap/simulator will not work until:  sudo apt install build-essential gcc-multilib  then re-run setup"
 fi

@@ -8,9 +8,11 @@
  * ENOTTY on a tty it reports CTS, DSR and carrier asserted and accepts
  * control-line changes. Everything else passes straight through.
  *
- *   gcc -shared -fPIC -O2 -o ptymodem64.so ptymodem.c -ldl
- *   gcc -m32 -shared -fPIC -O2 -o ptymodem32.so ptymodem.c -ldl
- *   LD_PRELOAD=/path/ptymodem32.so wine program.exe
+ *   sandbox/setup.sh builds it into lib/<multiarch>/ptymodem.so for both
+ *   architectures; run.sh preloads "ptymodem/$LIB/ptymodem.so" and the dynamic
+ *   loader resolves $LIB per process. By hand:
+ *   gcc [-m32] -shared -fPIC -O2 -o ptymodem.so ptymodem.c -ldl
+ *   LD_PRELOAD=/path/ptymodem.so wine program.exe
  */
 #define _GNU_SOURCE
 #include <dlfcn.h>
@@ -50,3 +52,13 @@ int ioctl(int fd, unsigned long request, ...)
         return ret;
     }
 }
+
+/* 32-bit builds with 64-bit time_t (Wine enables _TIME_BITS=64, and Debian /
+ * Ubuntu i386 glibc defaults to it) rename every ioctl() call site to
+ * __ioctl_time64. Without this alias the 32-bit shim loads but intercepts
+ * nothing - which is exactly what /proc/PID/maps showing ptymodem32.so and
+ * TIOCMGET still failing looked like. */
+#if !defined(__LP64__) && !defined(_LP64)
+int __ioctl_time64(int fd, unsigned long request, ...)
+    __attribute__((alias("ioctl")));
+#endif
